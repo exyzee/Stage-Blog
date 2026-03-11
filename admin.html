@@ -27,6 +27,39 @@
     </div>
   </div>
 
+  <!-- Setup Required Screen -->
+  <div class="setup-screen" id="setupScreen" style="display: none;">
+    <div class="setup-card">
+      <div class="setup-header">
+        <h1>⚙️ One-Time Setup Required</h1>
+        <p>Create the database table in Supabase, then everything works automatically!</p>
+      </div>
+      <div class="setup-instructions">
+        <div class="setup-step">
+          <span class="step-number">1</span>
+          <div class="step-content">
+            <p>Go to your <a href="https://supabase.com/dashboard" target="_blank">Supabase Dashboard</a></p>
+          </div>
+        </div>
+        <div class="setup-step">
+          <span class="step-number">2</span>
+          <div class="step-content">
+            <p>Click <strong>SQL Editor</strong> in the left sidebar</p>
+          </div>
+        </div>
+        <div class="setup-step">
+          <span class="step-number">3</span>
+          <div class="step-content">
+            <p>Click the button below to copy the setup SQL, then paste it in Supabase and click <strong>Run</strong></p>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="copySqlBtn" style="width: 100%; margin-bottom: 16px;">📋 Copy Setup SQL</button>
+      <button class="btn btn-secondary" id="retrySetupBtn" style="width: 100%;">I've run the SQL — Try Again</button>
+      <p class="setup-note">This is a one-time setup. After this, everything works from this dashboard!</p>
+    </div>
+  </div>
+
   <!-- Admin Dashboard -->
   <div class="admin-dashboard" id="adminDashboard" style="display: none;">
     

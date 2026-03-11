@@ -69,6 +69,90 @@
   min-height: 20px;
 }
 
+/* --- Setup Screen --- */
+.setup-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #FAFAFA 0%, #F0F0F0 100%);
+}
+
+.setup-card {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 40px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: var(--shadow-lg);
+}
+
+.setup-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.setup-header h1 {
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  font-weight: 400;
+  margin-bottom: 8px;
+}
+
+.setup-header p {
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+.setup-instructions {
+  margin-bottom: 24px;
+}
+
+.setup-step {
+  display: flex;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.setup-step:last-child {
+  border-bottom: none;
+}
+
+.step-number {
+  width: 28px;
+  height: 28px;
+  background: var(--color-text);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.step-content p {
+  font-size: 0.92rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.step-content a {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.setup-note {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  margin-top: 16px;
+}
+
 /* --- Buttons --- */
 .btn {
   display: inline-flex;
