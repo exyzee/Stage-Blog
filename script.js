@@ -94,30 +94,13 @@ async function loadAndRenderPosts() {
 
   let posts = [];
 
-  // Check if Supabase is available
-  const supabaseReady = typeof isSupabaseConfigured === 'function' && isSupabaseConfigured();
-
-  if (supabaseReady) {
-    console.log('[Blog] Fetching from Supabase...');
-    try {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('status', 'published')
-        .order('date', { ascending: false });
-
-      if (error) {
-        console.error('[Blog] Supabase error:', error.message);
-        throw error;
-      }
-      posts = data || [];
-      console.log('[Blog] Got', posts.length, 'posts from Supabase');
-    } catch (err) {
-      console.error('[Blog] Supabase failed, trying localStorage:', err);
-      posts = getLocalPosts();
-    }
-  } else {
-    console.log('[Blog] No Supabase — using localStorage');
+  // Always try Supabase first via plain fetch (no CDN needed)
+  try {
+    console.log('[Blog] Fetching from Supabase (REST)…');
+    posts = await fetchPublishedPosts();
+    console.log('[Blog] Got', posts.length, 'posts');
+  } catch (err) {
+    console.warn('[Blog] Supabase fetch failed:', err.message);
     posts = getLocalPosts();
   }
 
