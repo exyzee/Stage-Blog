@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Internship Journal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="admin-body">
+
+  <!-- Login Screen -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-card">
+      <div class="login-header">
+        <h1>🔐 Admin Access</h1>
+        <p>Enter password to manage your blog</p>
+      </div>
+      <form id="loginForm">
+        <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password" required>
+        <button type="submit" class="btn btn-primary">Enter</button>
+      </form>
+      <p class="login-error" id="loginError"></p>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div class="admin-dashboard" id="adminDashboard" style="display: none;">
+    
+    <!-- Admin Header -->
+    <header class="admin-header">
+      <div class="admin-header-left">
+        <h1>📝 Blog Admin</h1>
+        <a href="index.html" target="_blank" class="view-site-link">View Site →</a>
+      </div>
+      <button class="btn btn-ghost" id="logoutBtn">Logout</button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      
+      <!-- Sidebar: Posts List -->
+      <aside class="admin-sidebar">
+        <div class="sidebar-header">
+          <h2>Posts</h2>
+          <button class="btn btn-primary btn-sm" id="newPostBtn">+ New Post</button>
+        </div>
+        <div class="posts-list" id="postsList">
+          <!-- Posts will be loaded here -->
+        </div>
+      </aside>
+
+      <!-- Editor -->
+      <div class="admin-editor" id="adminEditor">
+        
+        <!-- No Post Selected -->
+        <div class="editor-empty" id="editorEmpty">
+          <div class="editor-empty-icon">✍️</div>
+          <h3>Select a post to edit</h3>
+          <p>Or create a new one to get started</p>
+        </div>
+
+        <!-- Post Editor Form -->
+        <form class="editor-form" id="editorForm" style="display: none;">
+          
+          <!-- Post Header -->
+          <div class="editor-header">
+            <div class="editor-meta-row">
+              <div class="input-group">
+                <label>Week Range</label>
+                <input type="text" id="postWeek" placeholder="e.g., Week 1–2" required>
+              </div>
+              <div class="input-group">
+                <label>Date</label>
+                <input type="date" id="postDate" required>
+              </div>
+              <div class="input-group">
+                <label>Status</label>
+                <select id="postStatus">
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                </select>
+              </div>
+            </div>
+            <div class="input-group">
+              <label>Post Title</label>
+              <input type="text" id="postTitle" placeholder="e.g., First Steps Into the Real World" required>
+            </div>
+            <div class="input-group">
+              <label>Short Excerpt (for card preview)</label>
+              <textarea id="postExcerpt" rows="2" placeholder="Brief summary of this entry..."></textarea>
+            </div>
+          </div>
+
+          <!-- Sections -->
+          <div class="editor-sections">
+            
+            <!-- Section 1: Activities -->
+            <div class="editor-section">
+              <div class="section-header-bar">
+                <span class="section-icon">🛠️</span>
+                <div class="section-info">
+                  <h3>What I've Been Working On</h3>
+                  <p class="section-hint">What have you been doing? What skills have you needed? Can you show realizations?</p>
+                </div>
+              </div>
+              <div class="rich-editor" id="section1Editor" data-section="activities"></div>
+            </div>
+
+            <!-- Section 2: Deadlines -->
+            <div class="editor-section">
+              <div class="section-header-bar">
+                <span class="section-icon">📅</span>
+                <div class="section-info">
+                  <h3>Deadlines & Planning</h3>
+                  <p class="section-hint">Have the deadlines been met? If not, why? What is your plan for the next few weeks?</p>
+                </div>
+              </div>
+              <div class="rich-editor" id="section2Editor" data-section="deadlines"></div>
+            </div>
+
+            <!-- Section 3: Learning -->
+            <div class="editor-section">
+              <div class="section-header-bar">
+                <span class="section-icon">💡</span>
+                <div class="section-info">
+                  <h3>What I Learned</h3>
+                  <p class="section-hint">Did you learn something new these weeks? What? In what way?</p>
+                </div>
+              </div>
+              <div class="rich-editor" id="section3Editor" data-section="learning"></div>
+            </div>
+
+            <!-- Section 4: Environment -->
+            <div class="editor-section">
+              <div class="section-header-bar">
+                <span class="section-icon">👥</span>
+                <div class="section-info">
+                  <h3>Environment & People</h3>
+                  <p class="section-hint">Tell something about your environment, colleagues, mentor, fellow students...</p>
+                </div>
+              </div>
+              <div class="rich-editor" id="section4Editor" data-section="environment"></div>
+            </div>
+
+            <!-- Section 5: Growth -->
+            <div class="editor-section">
+              <div class="section-header-bar">
+                <span class="section-icon">📊</span>
+                <div class="section-info">
+                  <h3>Strengths & Growth Areas</h3>
+                  <p class="section-hint">What are you already doing well? Where do you still see growth opportunities? (soft + technical skills)</p>
+                </div>
+              </div>
+              <div class="growth-editor">
+                <div class="growth-col">
+                  <label>💪 Going Well</label>
+                  <textarea id="strengthsEditor" rows="4" placeholder="• Visual design&#10;• Time management&#10;• Asking questions"></textarea>
+                </div>
+                <div class="growth-col">
+                  <label>🌱 Room to Grow</label>
+                  <textarea id="growthEditor" rows="4" placeholder="• Presenting ideas&#10;• Documentation&#10;• Handling ambiguity"></textarea>
+                </div>
+              </div>
+              <div class="input-group" style="margin-top: 16px;">
+                <label>How are you dealing with these?</label>
+                <textarea id="growthPlanEditor" rows="2" placeholder="What are you doing to improve?"></textarea>
+              </div>
+            </div>
+
+            <!-- Section 6: Positive -->
+            <div class="editor-section editor-section-highlight">
+              <div class="section-header-bar">
+                <span class="section-icon">✨</span>
+                <div class="section-info">
+                  <h3>Ending on a High Note</h3>
+                  <p class="section-hint">Always end your blog with a positive point!</p>
+                </div>
+              </div>
+              <div class="rich-editor" id="section6Editor" data-section="positive"></div>
+            </div>
+
+          </div>
+
+          <!-- Editor Actions -->
+          <div class="editor-actions">
+            <button type="button" class="btn btn-ghost" id="deletePostBtn">Delete Post</button>
+            <div class="editor-actions-right">
+              <button type="button" class="btn btn-secondary" id="previewBtn">Preview</button>
+              <button type="submit" class="btn btn-primary" id="saveBtn">Save Post</button>
+            </div>
+          </div>
+
+        </form>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- Preview Modal -->
+  <div class="preview-modal" id="previewModal">
+    <div class="preview-modal-header">
+      <h2>Preview</h2>
+      <button class="btn btn-ghost" id="closePreviewBtn">Close</button>
+    </div>
+    <div class="preview-modal-content" id="previewContent">
+      <!-- Preview will render here -->
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
