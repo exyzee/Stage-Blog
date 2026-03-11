@@ -96,6 +96,18 @@
         </div>
 
         <form class="editor-form" id="editorForm" style="display: none;">
+          
+          <!-- Quick Paste Mode -->
+          <div class="quick-paste-section" id="quickPasteSection">
+            <div class="quick-paste-header">
+              <h3>✨ Quick Paste from AI</h3>
+              <p>Paste your entire blog post and it'll auto-fill all sections</p>
+              <button type="button" class="btn btn-ghost btn-sm" id="toggleQuickPaste">Hide Quick Paste</button>
+            </div>
+            <textarea id="quickPasteInput" placeholder="Paste your blog post here...&#10;&#10;Example format:&#10;Week 5-6&#10;Date: 2026-03-23&#10;Title: My Amazing Week&#10;&#10;Activities:&#10;This week I worked on...&#10;&#10;Deadlines:&#10;All deadlines were met...&#10;&#10;(etc.)"></textarea>
+            <button type="button" class="btn btn-primary" id="autoFillBtn">🪄 Auto-Fill Sections</button>
+          </div>
+
           <div class="form-row">
             <div class="form-group">
               <label for="weekInput">Week</label>

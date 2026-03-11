@@ -53,6 +53,23 @@ function setupEventListeners() {
   previewModal.addEventListener('click', (e) => {
     if (e.target === previewModal) previewModal.classList.remove('open');
   });
+  
+  // Quick paste functionality
+  const autoFillBtn = document.getElementById('autoFillBtn');
+  const toggleQuickPaste = document.getElementById('toggleQuickPaste');
+  const quickPasteSection = document.getElementById('quickPasteSection');
+  
+  if (autoFillBtn) {
+    autoFillBtn.addEventListener('click', handleAutoFill);
+  }
+  
+  if (toggleQuickPaste && quickPasteSection) {
+    toggleQuickPaste.addEventListener('click', () => {
+      const isHidden = quickPasteSection.style.display === 'none';
+      quickPasteSection.style.display = isHidden ? 'block' : 'none';
+      toggleQuickPaste.textContent = isHidden ? 'Hide Quick Paste' : 'Show Quick Paste';
+    });
+  }
 }
 
 // ─── Auth ────────────────────────────────────
@@ -392,4 +409,209 @@ function showToast(message, type = 'info') {
   toast.textContent = message;
   toast.className = 'toast show ' + type;
   setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ─── Quick Paste Auto-Fill ──────────────────
+function handleAutoFill() {
+  const input = document.getElementById('quickPasteInput');
+  const text = input.value.trim();
+  
+  if (!text) {
+    showToast('Please paste some content first', 'error');
+    return;
+  }
+  
+  try {
+    const parsed = smartParseBlogPost(text);
+    
+    // Fill in metadata
+    if (parsed.week) document.getElementById('weekInput').value = parsed.week;
+    if (parsed.date) document.getElementById('dateInput').value = parsed.date;
+    if (parsed.title) document.getElementById('titleInput').value = parsed.title;
+    if (parsed.excerpt) document.getElementById('excerptInput').value = parsed.excerpt;
+    
+    // Fill in sections
+    if (parsed.activities) setEditorHTML('activitiesEditor', formatContent(parsed.activities));
+    if (parsed.deadlines) setEditorHTML('deadlinesEditor', formatContent(parsed.deadlines));
+    if (parsed.learning) setEditorHTML('learningEditor', formatContent(parsed.learning));
+    if (parsed.environment) setEditorHTML('environmentEditor', formatContent(parsed.environment));
+    if (parsed.positive) setEditorHTML('positiveEditor', formatContent(parsed.positive));
+    
+    if (parsed.strengths) document.getElementById('strengthsInput').value = parsed.strengths;
+    if (parsed.growth) document.getElementById('growthInput').value = parsed.growth;
+    if (parsed.growthPlan) document.getElementById('growthPlanInput').value = parsed.growthPlan;
+    
+    showToast('✨ Auto-filled successfully!', 'success');
+    
+    // Clear the paste area
+    input.value = '';
+    
+  } catch (err) {
+    console.error('Parse error:', err);
+    showToast('Could not parse content. Try formatting it better.', 'error');
+  }
+}
+
+function smartParseBlogPost(text) {
+  const result = {};
+  
+  // Normalize line breaks
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  
+  // Extract week (flexible patterns)
+  const weekMatch = text.match(/(?:week|Week|WEEK)[\s:]*([^\n]+)/i);
+  if (weekMatch) result.week = weekMatch[1].trim();
+  
+  // Extract date (various formats)
+  const dateMatch = text.match(/(?:date|Date|DATE)[\s:]*([^\n]+)/i);
+  if (dateMatch) {
+    const dateStr = dateMatch[1].trim();
+    // Try to parse and format as YYYY-MM-DD
+    const parsed = new Date(dateStr);
+    if (!isNaN(parsed)) {
+      result.date = parsed.toISOString().split('T')[0];
+    }
+  }
+  
+  // Extract title
+  const titleMatch = text.match(/(?:title|Title|TITLE)[\s:]*([^\n]+)/i);
+  if (titleMatch) {
+    result.title = titleMatch[1].trim();
+  } else {
+    // Try to find first big line that looks like a title
+    const lines = text.split('\n').filter(l => l.trim());
+    for (let line of lines) {
+      if (line.length > 10 && line.length < 100 && !line.includes(':')) {
+        result.title = line.trim();
+        break;
+      }
+    }
+  }
+  
+  // Extract excerpt/summary
+  const excerptMatch = text.match(/(?:excerpt|Excerpt|summary|Summary|EXCERPT)[\s:]*([^\n]+(?:\n(?!(?:week|date|title|activities|deadlines|learning|environment|strengths|growth|positive))[^\n]+)*)/i);
+  if (excerptMatch) {
+    result.excerpt = excerptMatch[1].trim().replace(/\n+/g, ' ').slice(0, 250);
+  }
+  
+  // Extract sections with flexible keywords
+  result.activities = extractSection(text, [
+    'activities', 'what i\'ve been working on', 'what have you been doing',
+    'work', 'tasks', 'working on', 'been doing'
+  ]);
+  
+  result.deadlines = extractSection(text, [
+    'deadlines', 'planning', 'timeline', 'schedule', 'next steps',
+    'upcoming', 'goals'
+  ]);
+  
+  result.learning = extractSection(text, [
+    'learning', 'learned', 'what i learned', 'new things', 'insights',
+    'lessons', 'takeaways'
+  ]);
+  
+  result.environment = extractSection(text, [
+    'environment', 'people', 'colleagues', 'team', 'mentor',
+    'office', 'workplace', 'culture'
+  ]);
+  
+  result.positive = extractSection(text, [
+    'positive', 'highlight', 'ending on a high note', 'best moment',
+    'exciting', 'grateful', 'looking forward'
+  ]);
+  
+  // Extract strengths and growth (often in lists)
+  const strengthsMatch = extractSection(text, [
+    'strengths', 'going well', 'doing well', 'good at', 'strong in'
+  ]);
+  if (strengthsMatch) {
+    result.strengths = convertToList(strengthsMatch);
+  }
+  
+  const growthMatch = extractSection(text, [
+    'growth', 'room to grow', 'improve', 'working on', 'challenges',
+    'areas for improvement'
+  ]);
+  if (growthMatch) {
+    result.growth = convertToList(growthMatch);
+  }
+  
+  const planMatch = extractSection(text, [
+    'growth plan', 'plan', 'how to improve', 'next steps for growth'
+  ]);
+  if (planMatch) {
+    result.growthPlan = planMatch;
+  }
+  
+  return result;
+}
+
+function extractSection(text, keywords) {
+  // Try each keyword
+  for (let keyword of keywords) {
+    const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(
+      `(?:^|\\n)\\s*(?:##?\\s*)?${escapedKeyword}[:\\s]*\\n([\\s\\S]*?)(?=\\n\\s*(?:##?\\s*)?(?:${allSectionKeywords.join('|')})[:\\s]*\\n|$)`,
+      'i'
+    );
+    const match = text.match(pattern);
+    if (match && match[1].trim()) {
+      return match[1].trim();
+    }
+  }
+  return '';
+}
+
+// All possible section headers for splitting
+const allSectionKeywords = [
+  'week', 'date', 'title', 'excerpt', 'summary',
+  'activities', 'what i\'ve been working on', 'work', 'tasks',
+  'deadlines', 'planning', 'timeline',
+  'learning', 'learned', 'lessons',
+  'environment', 'people', 'colleagues', 'team',
+  'strengths', 'going well', 'doing well',
+  'growth', 'room to grow', 'improve',
+  'growth plan', 'plan',
+  'positive', 'highlight', 'ending on a high note'
+];
+
+function convertToList(text) {
+  // If already in list format, keep it
+  if (text.match(/^[-•*]\s/m)) {
+    return text;
+  }
+  // Convert numbered list or comma-separated to bullet points
+  if (text.match(/^\d+\./m)) {
+    return text.replace(/^\d+\.\s*/gm, '• ');
+  }
+  // If comma or semicolon separated
+  if (text.includes(',') || text.includes(';')) {
+    return text.split(/[,;]+/).map(s => '• ' + s.trim()).join('\n');
+  }
+  // If newline separated, add bullets
+  return text.split('\n').filter(l => l.trim()).map(l => '• ' + l.trim()).join('\n');
+}
+
+function formatContent(text) {
+  // Convert plain text to HTML with paragraphs
+  if (!text) return '';
+  
+  // Split into paragraphs
+  const paragraphs = text.split(/\n\s*\n/);
+  return paragraphs
+    .map(p => {
+      p = p.trim();
+      if (!p) return '';
+      // Check if it's a list
+      if (p.match(/^[-•*]\s/m) || p.match(/^\d+\./m)) {
+        const items = p.split('\n').filter(l => l.trim());
+        return '<ul>' + items.map(item => {
+          const cleaned = item.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '');
+          return '<li>' + cleaned + '</li>';
+        }).join('') + '</ul>';
+      }
+      return '<p>' + p + '</p>';
+    })
+    .filter(Boolean)
+    .join('\n');
 }
