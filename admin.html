@@ -27,211 +27,160 @@
     </div>
   </div>
 
-  <!-- Setup Required Screen -->
+  <!-- GitHub Token Setup -->
   <div class="setup-screen" id="setupScreen" style="display: none;">
     <div class="setup-card">
       <div class="setup-header">
-        <h1>⚙️ One-Time Setup Required</h1>
-        <p>Create the database table in Supabase, then everything works automatically!</p>
+        <h1>🔑 GitHub Token Required</h1>
+        <p>One-time setup: create a GitHub personal access token</p>
       </div>
       <div class="setup-instructions">
         <div class="setup-step">
           <span class="step-number">1</span>
           <div class="step-content">
-            <p>Go to your <a href="https://supabase.com/dashboard" target="_blank">Supabase Dashboard</a></p>
+            <p>Go to <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener">GitHub → Create new token (classic)</a></p>
           </div>
         </div>
         <div class="setup-step">
           <span class="step-number">2</span>
           <div class="step-content">
-            <p>Click <strong>SQL Editor</strong> in the left sidebar</p>
+            <p>Set <strong>Note:</strong> "Blog Admin" and <strong>Expiration:</strong> No expiration</p>
           </div>
         </div>
         <div class="setup-step">
           <span class="step-number">3</span>
           <div class="step-content">
-            <p>Click the button below to copy the setup SQL, then paste it in Supabase and click <strong>Run</strong></p>
+            <p>Check <strong>✓ repo</strong> scope (Full control of private repositories)</p>
+          </div>
+        </div>
+        <div class="setup-step">
+          <span class="step-number">4</span>
+          <div class="step-content">
+            <p>Click <strong>Generate token</strong>, copy it, and paste here:</p>
+            <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" style="width: 100%; padding: 12px; margin-top: 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-family: monospace; font-size: 0.9rem;">
+            <button class="btn btn-primary" id="saveTokenBtn" style="margin-top: 12px; width: 100%;">Save Token & Continue</button>
           </div>
         </div>
       </div>
-      <button class="btn btn-primary" id="copySqlBtn" style="width: 100%; margin-bottom: 16px;">📋 Copy Setup SQL</button>
-      <button class="btn btn-secondary" id="retrySetupBtn" style="width: 100%;">I've run the SQL — Try Again</button>
-      <p class="setup-note">This is a one-time setup. After this, everything works from this dashboard!</p>
     </div>
   </div>
 
   <!-- Admin Dashboard -->
   <div class="admin-dashboard" id="adminDashboard" style="display: none;">
     
-    <!-- Admin Header -->
-    <header class="admin-header">
-      <div class="admin-header-left">
-        <h1>📝 Blog Admin</h1>
-        <a href="index.html" target="_blank" class="view-site-link">View Site →</a>
+    <!-- Header -->
+    <div class="admin-header">
+      <div>
+        <h1>Internship Journal — Admin</h1>
+        <p class="admin-subtitle">Managing posts in <code>posts.json</code></p>
       </div>
       <button class="btn btn-ghost" id="logoutBtn">Logout</button>
-    </header>
+    </div>
 
-    <!-- Main Content -->
-    <main class="admin-main">
+    <div class="admin-layout">
       
-      <!-- Sidebar: Posts List -->
+      <!-- Sidebar -->
       <aside class="admin-sidebar">
-        <div class="sidebar-header">
-          <h2>Posts</h2>
-          <button class="btn btn-primary btn-sm" id="newPostBtn">+ New Post</button>
-        </div>
+        <button class="btn btn-primary" id="newPostBtn">+ New Post</button>
         <div class="posts-list" id="postsList">
-          <!-- Posts will be loaded here -->
+          <!-- Will be populated by JS -->
         </div>
       </aside>
 
       <!-- Editor -->
-      <div class="admin-editor" id="adminEditor">
-        
-        <!-- No Post Selected -->
+      <main class="admin-editor">
         <div class="editor-empty" id="editorEmpty">
-          <div class="editor-empty-icon">✍️</div>
-          <h3>Select a post to edit</h3>
-          <p>Or create a new one to get started</p>
+          <div class="empty-icon">📝</div>
+          <h3>No post selected</h3>
+          <p>Create a new post or select one from the sidebar</p>
         </div>
 
-        <!-- Post Editor Form -->
         <form class="editor-form" id="editorForm" style="display: none;">
-          
-          <!-- Post Header -->
-          <div class="editor-header">
-            <div class="editor-meta-row">
-              <div class="input-group">
-                <label>Week Range</label>
-                <input type="text" id="postWeek" placeholder="e.g., Week 1–2" required>
-              </div>
-              <div class="input-group">
-                <label>Date</label>
-                <input type="date" id="postDate" required>
-              </div>
-              <div class="input-group">
-                <label>Status</label>
-                <select id="postStatus">
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                </select>
-              </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="weekInput">Week</label>
+              <input type="text" id="weekInput" placeholder="e.g., Week 1–2" required>
             </div>
-            <div class="input-group">
-              <label>Post Title</label>
-              <input type="text" id="postTitle" placeholder="e.g., First Steps Into the Real World" required>
+            <div class="form-group">
+              <label for="dateInput">Date</label>
+              <input type="date" id="dateInput" required>
             </div>
-            <div class="input-group">
-              <label>Short Excerpt (for card preview)</label>
-              <textarea id="postExcerpt" rows="2" placeholder="Brief summary of this entry..."></textarea>
+            <div class="form-group">
+              <label for="statusInput">Status</label>
+              <select id="statusInput">
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
             </div>
           </div>
 
-          <!-- Sections -->
-          <div class="editor-sections">
-            
-            <!-- Section 1: Activities -->
-            <div class="editor-section">
-              <div class="section-header-bar">
-                <span class="section-icon">🛠️</span>
-                <div class="section-info">
-                  <h3>What I've Been Working On</h3>
-                  <p class="section-hint">What have you been doing? What skills have you needed? Can you show realizations?</p>
-                </div>
-              </div>
-              <div class="rich-editor" id="section1Editor" data-section="activities"></div>
+          <div class="form-group">
+            <label for="titleInput">Title</label>
+            <input type="text" id="titleInput" placeholder="Post title" required>
+          </div>
+
+          <div class="form-group">
+            <label for="excerptInput">Excerpt</label>
+            <textarea id="excerptInput" rows="2" placeholder="Brief summary (shown on cards)" required></textarea>
+          </div>
+
+          <div class="sections-container">
+            <h3>Content Sections</h3>
+            <p class="hint">Use the rich editor toolbar: <strong>Bold</strong>, <em>Italic</em>, <u>Link</u></p>
+
+            <div class="form-group">
+              <label>🛠️ What I've Been Working On</label>
+              <div class="rich-editor" id="activitiesEditor" contenteditable="true" data-placeholder="What have you been doing for the past two weeks? What skills have you needed?"></div>
             </div>
 
-            <!-- Section 2: Deadlines -->
-            <div class="editor-section">
-              <div class="section-header-bar">
-                <span class="section-icon">📅</span>
-                <div class="section-info">
-                  <h3>Deadlines & Planning</h3>
-                  <p class="section-hint">Have the deadlines been met? If not, why? What is your plan for the next few weeks?</p>
-                </div>
-              </div>
-              <div class="rich-editor" id="section2Editor" data-section="deadlines"></div>
+            <div class="form-group">
+              <label>📅 Deadlines & Planning</label>
+              <div class="rich-editor" id="deadlinesEditor" contenteditable="true" data-placeholder="Have the deadlines been met? What's your plan for the next few weeks?"></div>
             </div>
 
-            <!-- Section 3: Learning -->
-            <div class="editor-section">
-              <div class="section-header-bar">
-                <span class="section-icon">💡</span>
-                <div class="section-info">
-                  <h3>What I Learned</h3>
-                  <p class="section-hint">Did you learn something new these weeks? What? In what way?</p>
-                </div>
-              </div>
-              <div class="rich-editor" id="section3Editor" data-section="learning"></div>
+            <div class="form-group">
+              <label>💡 What I Learned</label>
+              <div class="rich-editor" id="learningEditor" contenteditable="true" data-placeholder="Did you learn something new these weeks? What? In what way?"></div>
             </div>
 
-            <!-- Section 4: Environment -->
-            <div class="editor-section">
-              <div class="section-header-bar">
-                <span class="section-icon">👥</span>
-                <div class="section-info">
-                  <h3>Environment & People</h3>
-                  <p class="section-hint">Tell something about your environment, colleagues, mentor, fellow students...</p>
-                </div>
-              </div>
-              <div class="rich-editor" id="section4Editor" data-section="environment"></div>
+            <div class="form-group">
+              <label>👥 Environment & People</label>
+              <div class="rich-editor" id="environmentEditor" contenteditable="true" data-placeholder="Tell something about your environment, colleagues, mentor..."></div>
             </div>
 
-            <!-- Section 5: Growth -->
-            <div class="editor-section">
-              <div class="section-header-bar">
-                <span class="section-icon">📊</span>
-                <div class="section-info">
-                  <h3>Strengths & Growth Areas</h3>
-                  <p class="section-hint">What are you already doing well? Where do you still see growth opportunities? (soft + technical skills)</p>
-                </div>
-              </div>
-              <div class="growth-editor">
-                <div class="growth-col">
+            <div class="growth-section">
+              <h4>📊 Strengths & Growth</h4>
+              <div class="growth-grid">
+                <div class="form-group">
                   <label>💪 Going Well</label>
-                  <textarea id="strengthsEditor" rows="4" placeholder="• Visual design&#10;• Time management&#10;• Asking questions"></textarea>
+                  <textarea id="strengthsInput" rows="4" placeholder="• Skill 1&#10;• Skill 2&#10;• Skill 3"></textarea>
                 </div>
-                <div class="growth-col">
+                <div class="form-group">
                   <label>🌱 Room to Grow</label>
-                  <textarea id="growthEditor" rows="4" placeholder="• Presenting ideas&#10;• Documentation&#10;• Handling ambiguity"></textarea>
+                  <textarea id="growthInput" rows="4" placeholder="• Area 1&#10;• Area 2&#10;• Area 3"></textarea>
                 </div>
               </div>
-              <div class="input-group" style="margin-top: 16px;">
-                <label>How are you dealing with these?</label>
-                <textarea id="growthPlanEditor" rows="2" placeholder="What are you doing to improve?"></textarea>
+              <div class="form-group">
+                <label>Growth Plan</label>
+                <textarea id="growthPlanInput" rows="2" placeholder="How do you deal with these growth areas?"></textarea>
               </div>
             </div>
 
-            <!-- Section 6: Positive -->
-            <div class="editor-section editor-section-highlight">
-              <div class="section-header-bar">
-                <span class="section-icon">✨</span>
-                <div class="section-info">
-                  <h3>Ending on a High Note</h3>
-                  <p class="section-hint">Always end your blog with a positive point!</p>
-                </div>
-              </div>
-              <div class="rich-editor" id="section6Editor" data-section="positive"></div>
+            <div class="form-group">
+              <label>✨ Ending on a High Note</label>
+              <div class="rich-editor" id="positiveEditor" contenteditable="true" data-placeholder="Always end your blog with a positive point!"></div>
             </div>
-
           </div>
 
-          <!-- Editor Actions -->
           <div class="editor-actions">
-            <button type="button" class="btn btn-ghost" id="deletePostBtn">Delete Post</button>
-            <div class="editor-actions-right">
-              <button type="button" class="btn btn-secondary" id="previewBtn">Preview</button>
-              <button type="submit" class="btn btn-primary" id="saveBtn">Save Post</button>
-            </div>
+            <button type="submit" class="btn btn-primary">Save Post</button>
+            <button type="button" class="btn btn-secondary" id="previewBtn">Preview</button>
+            <button type="button" class="btn btn-danger" id="deletePostBtn">Delete</button>
           </div>
-
         </form>
-      </div>
+      </main>
 
-    </main>
-
+    </div>
   </div>
 
   <!-- Preview Modal -->
@@ -248,8 +197,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js"></script>
+  <script src="github-config.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

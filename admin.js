@@ -1,43 +1,14 @@
 /* ============================================
-   ADMIN PANEL — BLOG MANAGEMENT
-   All data flows through Supabase JS client.
-   No manual SQL for data. Ever.
+   ADMIN PANEL — GITHUB BACKEND
+   Posts stored in posts.json, committed via GitHub API
    ============================================ */
 
 const ADMIN_PASSWORD = 'jhajhablinks';
 
-// Minimal SQL: just table + RLS. Data is handled by JS.
-const SETUP_SQL = `-- Run this ONCE in Supabase SQL Editor
-
-CREATE TABLE IF NOT EXISTS posts (
-  id TEXT PRIMARY KEY,
-  week TEXT,
-  date DATE,
-  status TEXT DEFAULT 'draft',
-  title TEXT,
-  excerpt TEXT,
-  sections JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Anyone can read published" ON posts;
-DROP POLICY IF EXISTS "Anyone can do anything" ON posts;
-
--- Let anyone read published posts (public blog)
-CREATE POLICY "Anyone can read published" ON posts
-  FOR SELECT USING (true);
-
--- Let anyone insert/update/delete (admin uses anon key)
-CREATE POLICY "Anyone can do anything" ON posts
-  FOR ALL USING (true) WITH CHECK (true);
-`;
-
 // ─── State ───────────────────────────────────
 let currentPostId = null;
 let posts = [];
-let useSupabase = false;
+let postsSha = null;
 
 // ─── DOM ─────────────────────────────────────
 const loginScreen = document.getElementById('loginScreen');
@@ -46,6 +17,8 @@ const adminDashboard = document.getElementById('adminDashboard');
 const loginForm = document.getElementById('loginForm');
 const passwordInput = document.getElementById('passwordInput');
 const loginError = document.getElementById('loginError');
+const tokenInput = document.getElementById('tokenInput');
+const saveTokenBtn = document.getElementById('saveTokenBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const newPostBtn = document.getElementById('newPostBtn');
 const postsList = document.getElementById('postsList');
@@ -57,18 +30,12 @@ const closePreviewBtn = document.getElementById('closePreviewBtn');
 const previewBtn = document.getElementById('previewBtn');
 const deletePostBtn = document.getElementById('deletePostBtn');
 const toast = document.getElementById('toast');
-const copySqlBtn = document.getElementById('copySqlBtn');
-const retrySetupBtn = document.getElementById('retrySetupBtn');
 
 // ─── Init ────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  useSupabase = typeof isSupabaseConfigured === 'function' && isSupabaseConfigured();
-  console.log('[Admin] Supabase configured:', useSupabase);
-
   if (sessionStorage.getItem('admin_logged_in') === 'true') {
     await tryShowDashboard();
   }
-
   setupEventListeners();
   initializeRichEditors();
 });
@@ -82,28 +49,10 @@ function setupEventListeners() {
   previewBtn.addEventListener('click', showPreview);
   closePreviewBtn.addEventListener('click', () => previewModal.classList.remove('open'));
   deletePostBtn.addEventListener('click', handleDeletePost);
+  saveTokenBtn.addEventListener('click', handleSaveToken);
   previewModal.addEventListener('click', (e) => {
     if (e.target === previewModal) previewModal.classList.remove('open');
   });
-
-  if (copySqlBtn) {
-    copySqlBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(SETUP_SQL).then(() => {
-        copySqlBtn.textContent = '✓ Copied!';
-        setTimeout(() => copySqlBtn.textContent = '📋 Copy Setup SQL', 2000);
-      });
-    });
-  }
-
-  if (retrySetupBtn) {
-    retrySetupBtn.addEventListener('click', async () => {
-      retrySetupBtn.textContent = 'Checking...';
-      retrySetupBtn.disabled = true;
-      await tryShowDashboard();
-      retrySetupBtn.textContent = "I've run the SQL — Try Again";
-      retrySetupBtn.disabled = false;
-    });
-  }
 }
 
 // ─── Auth ────────────────────────────────────
@@ -128,360 +77,319 @@ function handleLogout() {
   passwordInput.value = '';
 }
 
-async function tryShowDashboard() {
-  loginScreen.style.display = 'none';
-
-  if (useSupabase) {
-    const ok = await checkTable();
-    if (!ok) {
-      console.log('[Admin] Table not found — showing setup screen');
-      setupScreen.style.display = 'flex';
-      adminDashboard.style.display = 'none';
-      return;
-    }
+async function handleSaveToken() {
+  const token = tokenInput.value.trim();
+  if (!token) {
+    alert('Please enter a token');
+    return;
   }
-
-  setupScreen.style.display = 'none';
-  adminDashboard.style.display = 'block';
-  await loadPosts();
-  renderPostsList();
+  setGitHubToken(token);
+  saveTokenBtn.textContent = 'Checking...';
+  saveTokenBtn.disabled = true;
+  
+  try {
+    await loadPosts();
+    setupScreen.style.display = 'none';
+    adminDashboard.style.display = 'block';
+    renderPostsList();
+    showToast('Token saved! Ready to manage posts.', 'success');
+  } catch (err) {
+    alert('Token failed: ' + err.message + '\n\nMake sure you checked the "repo" scope.');
+    saveTokenBtn.textContent = 'Save Token & Continue';
+    saveTokenBtn.disabled = false;
+  }
 }
 
-async function checkTable() {
+async function tryShowDashboard() {
+  loginScreen.style.display = 'none';
+  
+  const token = localStorage.getItem('github_token');
+  if (!token) {
+    console.log('[Admin] No GitHub token — showing setup');
+    setupScreen.style.display = 'flex';
+    adminDashboard.style.display = 'none';
+    return;
+  }
+  
+  setGitHubToken(token);
+  
   try {
-    const { error } = await supabase.from('posts').select('id').limit(1);
-    if (error) {
-      console.log('[Admin] Table check error:', error.message);
-      return !error.message.includes('does not exist') && !error.message.includes('relation');
-    }
-    return true;
+    await loadPosts();
+    setupScreen.style.display = 'none';
+    adminDashboard.style.display = 'block';
+    renderPostsList();
   } catch (err) {
-    console.log('[Admin] Table check exception:', err);
-    return false;
+    console.error('[Admin] Failed to load posts:', err);
+    setupScreen.style.display = 'flex';
+    adminDashboard.style.display = 'none';
   }
 }
 
 // ─── Posts CRUD ──────────────────────────────
 async function loadPosts() {
-  if (useSupabase) {
-    try {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .order('date', { ascending: false });
-
-      if (error) throw error;
-
-      posts = (data || []).map(p => ({
-        ...p,
-        sections: typeof p.sections === 'string' ? JSON.parse(p.sections) : p.sections
-      }));
-      console.log('[Admin] Loaded', posts.length, 'posts from Supabase');
-    } catch (err) {
-      console.error('[Admin] Load error:', err);
-      showToast('Error loading posts: ' + err.message, 'error');
-      loadLocalPosts();
-    }
-  } else {
-    loadLocalPosts();
-  }
+  const { posts: allPosts, sha } = await fetchAllPosts();
+  posts = allPosts.sort((a, b) => new Date(b.date) - new Date(a.date));
+  postsSha = sha;
+  console.log('[Admin] Loaded', posts.length, 'posts');
 }
 
-function loadLocalPosts() {
-  const stored = localStorage.getItem('internship_blog_posts');
-  posts = stored ? JSON.parse(stored) : [];
-}
-
-function saveLocalPosts() {
-  localStorage.setItem('internship_blog_posts', JSON.stringify(posts));
+async function saveAllPosts() {
+  const res = await savePosts(posts, postsSha);
+  postsSha = res.content.sha;
+  console.log('[Admin] Saved posts to GitHub');
 }
 
 function renderPostsList() {
   if (!posts.length) {
-    postsList.innerHTML = '<div class="posts-list-empty">No posts yet.<br>Click "+ New Post" to start!</div>';
+    postsList.innerHTML = '<p style="padding: 20px; text-align: center; color: var(--color-text-muted); font-size: 0.9rem;">No posts yet</p>';
     return;
   }
 
-  const sorted = [...posts].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  postsList.innerHTML = sorted.map(p => `
-    <div class="post-list-item ${p.id === currentPostId ? 'active' : ''}" data-id="${p.id}">
-      <div class="post-list-item-week">
-        <span class="status-dot ${p.status}"></span>
-        ${p.week || 'No week'}
+  postsList.innerHTML = posts.map(p => `
+    <div class="post-item ${p.id === currentPostId ? 'active' : ''}" data-id="${p.id}">
+      <div class="post-item-header">
+        <h4>${p.title || 'Untitled'}</h4>
+        <span class="status-badge status-${p.status}">${p.status}</span>
       </div>
-      <div class="post-list-item-title">${p.title || 'Untitled'}</div>
+      <p class="post-item-meta">${p.week || 'No week'} • ${fmtDate(p.date)}</p>
     </div>
   `).join('');
 
-  postsList.querySelectorAll('.post-list-item').forEach(item => {
-    item.addEventListener('click', () => loadPostIntoEditor(item.dataset.id));
+  postsList.querySelectorAll('.post-item').forEach(el => {
+    el.addEventListener('click', () => loadPostIntoEditor(el.dataset.id));
   });
 }
 
-async function createNewPost() {
-  const newPost = {
-    id: 'post_' + Date.now(),
-    week: '',
-    date: new Date().toISOString().split('T')[0],
-    status: 'draft',
-    title: '',
-    excerpt: '',
-    sections: {
-      activities: '', deadlines: '', learning: '', environment: '',
-      strengths: '', growth: '', growthPlan: '', positive: ''
-    }
-  };
-
-  if (useSupabase) {
-    try {
-      const { error } = await supabase.from('posts').insert(newPost);
-      if (error) throw error;
-    } catch (err) {
-      showToast('Error creating post: ' + err.message, 'error');
-      return;
-    }
-  }
-
-  posts.push(newPost);
-  if (!useSupabase) saveLocalPosts();
-  renderPostsList();
-  loadPostIntoEditor(newPost.id);
-  showToast('New post created!', 'success');
-}
-
-function loadPostIntoEditor(postId) {
-  const post = posts.find(p => p.id === postId);
-  if (!post) return;
-
-  currentPostId = postId;
-
-  postsList.querySelectorAll('.post-list-item').forEach(item => {
-    item.classList.toggle('active', item.dataset.id === postId);
-  });
-
+// ─── Editor ──────────────────────────────────
+function createNewPost() {
+  currentPostId = 'post_' + Date.now();
+  const today = new Date().toISOString().split('T')[0];
+  
   editorEmpty.style.display = 'none';
   editorForm.style.display = 'block';
+  
+  document.getElementById('weekInput').value = '';
+  document.getElementById('dateInput').value = today;
+  document.getElementById('statusInput').value = 'draft';
+  document.getElementById('titleInput').value = '';
+  document.getElementById('excerptInput').value = '';
+  
+  clearEditor('activitiesEditor');
+  clearEditor('deadlinesEditor');
+  clearEditor('learningEditor');
+  clearEditor('environmentEditor');
+  clearEditor('positiveEditor');
+  
+  document.getElementById('strengthsInput').value = '';
+  document.getElementById('growthInput').value = '';
+  document.getElementById('growthPlanInput').value = '';
+  
+  renderPostsList();
+  document.getElementById('titleInput').focus();
+}
 
-  document.getElementById('postWeek').value = post.week || '';
-  document.getElementById('postDate').value = post.date || '';
-  document.getElementById('postStatus').value = post.status || 'draft';
-  document.getElementById('postTitle').value = post.title || '';
-  document.getElementById('postExcerpt').value = post.excerpt || '';
-
+function loadPostIntoEditor(id) {
+  const post = posts.find(p => p.id === id);
+  if (!post) return;
+  
+  currentPostId = id;
+  editorEmpty.style.display = 'none';
+  editorForm.style.display = 'block';
+  
+  document.getElementById('weekInput').value = post.week || '';
+  document.getElementById('dateInput').value = post.date || '';
+  document.getElementById('statusInput').value = post.status || 'draft';
+  document.getElementById('titleInput').value = post.title || '';
+  document.getElementById('excerptInput').value = post.excerpt || '';
+  
   const s = post.sections || {};
-  setEditorContent('section1Editor', s.activities || '');
-  setEditorContent('section2Editor', s.deadlines || '');
-  setEditorContent('section3Editor', s.learning || '');
-  setEditorContent('section4Editor', s.environment || '');
-  setEditorContent('section6Editor', s.positive || '');
-  document.getElementById('strengthsEditor').value = s.strengths || '';
-  document.getElementById('growthEditor').value = s.growth || '';
-  document.getElementById('growthPlanEditor').value = s.growthPlan || '';
+  setEditorHTML('activitiesEditor', s.activities || '');
+  setEditorHTML('deadlinesEditor', s.deadlines || '');
+  setEditorHTML('learningEditor', s.learning || '');
+  setEditorHTML('environmentEditor', s.environment || '');
+  setEditorHTML('positiveEditor', s.positive || '');
+  
+  document.getElementById('strengthsInput').value = s.strengths || '';
+  document.getElementById('growthInput').value = s.growth || '';
+  document.getElementById('growthPlanInput').value = s.growthPlan || '';
+  
+  renderPostsList();
 }
 
 async function handleSavePost(e) {
   e.preventDefault();
-  if (!currentPostId) return;
-
-  const idx = posts.findIndex(p => p.id === currentPostId);
-  if (idx === -1) return;
-
-  const updated = {
-    ...posts[idx],
-    week: document.getElementById('postWeek').value,
-    date: document.getElementById('postDate').value,
-    status: document.getElementById('postStatus').value,
-    title: document.getElementById('postTitle').value,
-    excerpt: document.getElementById('postExcerpt').value,
+  
+  const postData = {
+    id: currentPostId,
+    week: document.getElementById('weekInput').value.trim(),
+    date: document.getElementById('dateInput').value,
+    status: document.getElementById('statusInput').value,
+    title: document.getElementById('titleInput').value.trim(),
+    excerpt: document.getElementById('excerptInput').value.trim(),
     sections: {
-      activities: getEditorContent('section1Editor'),
-      deadlines: getEditorContent('section2Editor'),
-      learning: getEditorContent('section3Editor'),
-      environment: getEditorContent('section4Editor'),
-      strengths: document.getElementById('strengthsEditor').value,
-      growth: document.getElementById('growthEditor').value,
-      growthPlan: document.getElementById('growthPlanEditor').value,
-      positive: getEditorContent('section6Editor')
+      activities: getEditorHTML('activitiesEditor'),
+      deadlines: getEditorHTML('deadlinesEditor'),
+      learning: getEditorHTML('learningEditor'),
+      environment: getEditorHTML('environmentEditor'),
+      strengths: document.getElementById('strengthsInput').value.trim(),
+      growth: document.getElementById('growthInput').value.trim(),
+      growthPlan: document.getElementById('growthPlanInput').value.trim(),
+      positive: getEditorHTML('positiveEditor')
     }
   };
-
-  if (useSupabase) {
-    try {
-      const { error } = await supabase
-        .from('posts')
-        .update({
-          week: updated.week, date: updated.date, status: updated.status,
-          title: updated.title, excerpt: updated.excerpt, sections: updated.sections
-        })
-        .eq('id', currentPostId);
-      if (error) throw error;
-      console.log('[Admin] Saved to Supabase:', currentPostId);
-    } catch (err) {
-      showToast('Error saving: ' + err.message, 'error');
-      return;
-    }
+  
+  const idx = posts.findIndex(p => p.id === currentPostId);
+  if (idx >= 0) {
+    posts[idx] = postData;
+  } else {
+    posts.unshift(postData);
   }
-
-  posts[idx] = updated;
-  if (!useSupabase) saveLocalPosts();
-  renderPostsList();
-  showToast('Post saved!', 'success');
+  
+  try {
+    await saveAllPosts();
+    showToast('Post saved!', 'success');
+    renderPostsList();
+  } catch (err) {
+    showToast('Failed to save: ' + err.message, 'error');
+  }
 }
 
 async function handleDeletePost() {
   if (!currentPostId) return;
   if (!confirm('Delete this post permanently?')) return;
-
-  if (useSupabase) {
-    try {
-      const { error } = await supabase.from('posts').delete().eq('id', currentPostId);
-      if (error) throw error;
-      console.log('[Admin] Deleted from Supabase:', currentPostId);
-    } catch (err) {
-      showToast('Error deleting: ' + err.message, 'error');
-      return;
-    }
-  }
-
+  
   posts = posts.filter(p => p.id !== currentPostId);
-  if (!useSupabase) saveLocalPosts();
-  currentPostId = null;
-  editorEmpty.style.display = 'flex';
-  editorForm.style.display = 'none';
-  renderPostsList();
-  showToast('Post deleted', 'success');
+  
+  try {
+    await saveAllPosts();
+    showToast('Post deleted', 'success');
+    currentPostId = null;
+    editorForm.style.display = 'none';
+    editorEmpty.style.display = 'flex';
+    renderPostsList();
+  } catch (err) {
+    showToast('Failed to delete: ' + err.message, 'error');
+  }
 }
 
-// ─── Rich Text Editor ────────────────────────
+// ─── Rich Editor ─────────────────────────────
 function initializeRichEditors() {
   document.querySelectorAll('.rich-editor').forEach(editor => {
-    const section = editor.dataset.section;
-    const placeholder = getPlaceholder(section);
-
-    editor.innerHTML = `
-      <div class="rich-editor-toolbar">
-        <button type="button" class="toolbar-btn" data-command="bold" title="Bold"><b>B</b></button>
-        <button type="button" class="toolbar-btn" data-command="italic" title="Italic"><i>I</i></button>
-        <span class="toolbar-divider"></span>
-        <button type="button" class="toolbar-btn" data-command="insertUnorderedList" title="Bullet List">•</button>
-        <button type="button" class="toolbar-btn" data-command="createLink" title="Add Link">🔗</button>
-      </div>
-      <div class="rich-editor-content" contenteditable="true" data-placeholder="${placeholder}"></div>
-    `;
-
-    const content = editor.querySelector('.rich-editor-content');
-    editor.querySelector('.rich-editor-toolbar').querySelectorAll('.toolbar-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        const cmd = btn.dataset.command;
-        if (cmd === 'createLink') {
-          const url = prompt('Enter URL:');
-          if (url) document.execCommand('createLink', false, url);
-        } else {
-          document.execCommand(cmd, false, null);
+        document.execCommand('insertHTML', false, '<br><br>');
+      }
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === 'b') {
+          e.preventDefault();
+          document.execCommand('bold');
+        } else if (e.key === 'i') {
+          e.preventDefault();
+          document.execCommand('italic');
         }
-        content.focus();
-      });
+      }
     });
   });
 }
 
-function getPlaceholder(section) {
-  const map = {
-    activities: 'Describe what you worked on, skills you used, and any realizations...',
-    deadlines: 'Did you meet your deadlines? What\'s coming up next?',
-    learning: 'What new things did you learn? How did you learn them?',
-    environment: 'Tell us about your workspace, colleagues, mentor...',
-    positive: 'End with something positive! A win, a nice moment, something you\'re proud of...'
-  };
-  return map[section] || 'Write here...';
+function getEditorHTML(id) {
+  const el = document.getElementById(id);
+  return el.innerHTML.trim();
 }
 
-function setEditorContent(editorId, content) {
-  const el = document.getElementById(editorId)?.querySelector('.rich-editor-content');
-  if (el) el.innerHTML = content;
+function setEditorHTML(id, html) {
+  const el = document.getElementById(id);
+  el.innerHTML = html;
 }
 
-function getEditorContent(editorId) {
-  const el = document.getElementById(editorId)?.querySelector('.rich-editor-content');
-  return el ? el.innerHTML : '';
+function clearEditor(id) {
+  document.getElementById(id).innerHTML = '';
 }
 
 // ─── Preview ─────────────────────────────────
 function showPreview() {
-  const post = {
-    week: document.getElementById('postWeek').value,
-    date: document.getElementById('postDate').value,
-    title: document.getElementById('postTitle').value,
-    sections: {
-      activities: getEditorContent('section1Editor'),
-      deadlines: getEditorContent('section2Editor'),
-      learning: getEditorContent('section3Editor'),
-      environment: getEditorContent('section4Editor'),
-      strengths: document.getElementById('strengthsEditor').value,
-      growth: document.getElementById('growthEditor').value,
-      growthPlan: document.getElementById('growthPlanEditor').value,
-      positive: getEditorContent('section6Editor')
-    }
+  const s = {
+    activities: getEditorHTML('activitiesEditor'),
+    deadlines: getEditorHTML('deadlinesEditor'),
+    learning: getEditorHTML('learningEditor'),
+    environment: getEditorHTML('environmentEditor'),
+    strengths: document.getElementById('strengthsInput').value.trim(),
+    growth: document.getElementById('growthInput').value.trim(),
+    growthPlan: document.getElementById('growthPlanInput').value.trim(),
+    positive: getEditorHTML('positiveEditor')
   };
-
-  const formattedDate = post.date
-    ? new Date(post.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    : 'No date';
-
+  
+  const title = document.getElementById('titleInput').value.trim() || 'Untitled';
+  const week = document.getElementById('weekInput').value.trim() || 'Entry';
+  const date = fmtDate(document.getElementById('dateInput').value);
+  
   previewContent.innerHTML = `
-    <style>
-      .preview-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-      .preview-date { font-size: 0.9rem; color: var(--color-text-muted); }
-      .preview-title { font-family: var(--font-heading); font-size: 2rem; font-weight: 400; margin-bottom: 40px; line-height: 1.2; }
-      .preview-section { margin-bottom: 32px; padding: 24px; background: var(--color-bg-alt); border-radius: var(--radius-md); }
-      .preview-section h2 { font-family: var(--font-heading); font-size: 1.2rem; font-weight: 400; margin-bottom: 16px; }
-      .preview-content { font-size: 0.95rem; line-height: 1.7; color: var(--color-text-secondary); }
-      .preview-content p { margin-bottom: 12px; }
-      .preview-content ul { margin: 12px 0; padding-left: 20px; }
-      .preview-content li { margin-bottom: 6px; }
-      .preview-content strong { color: var(--color-text); font-weight: 600; }
-      .preview-skills { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-      .preview-skill-card { padding: 20px; border-radius: var(--radius-sm); }
-      .preview-skill-card h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 12px; }
-      .preview-skill-card ul { list-style: none; font-size: 0.9rem; color: var(--color-text-secondary); padding: 0; }
-      .preview-skill-card li { padding: 4px 0; }
-      .preview-section-highlight { background: linear-gradient(135deg, var(--color-accent-light), #F5F0FF); }
-      .preview-section-highlight .preview-content { color: var(--color-text); }
-    </style>
-    <div class="post-preview">
-      <div class="preview-meta">
-        <span class="week-badge">${post.week || 'No week'}</span>
-        <span class="preview-date">${formattedDate}</span>
+    <div class="modal-header" style="padding: 36px 44px; border-bottom: 1px solid var(--color-border-light);">
+      <div class="modal-meta" style="display: flex; gap: 12px; margin-bottom: 12px;">
+        <span class="week-badge">${week}</span>
       </div>
-      <h1 class="preview-title">${post.title || 'Untitled'}</h1>
-      <div class="preview-section"><h2>🛠️ What I've Been Working On</h2><div class="preview-content">${post.sections.activities || '<em>No content yet</em>'}</div></div>
-      <div class="preview-section"><h2>📅 Deadlines & Planning</h2><div class="preview-content">${post.sections.deadlines || '<em>No content yet</em>'}</div></div>
-      <div class="preview-section"><h2>💡 What I Learned</h2><div class="preview-content">${post.sections.learning || '<em>No content yet</em>'}</div></div>
-      <div class="preview-section"><h2>👥 Environment & People</h2><div class="preview-content">${post.sections.environment || '<em>No content yet</em>'}</div></div>
-      <div class="preview-section">
-        <h2>📊 Strengths & Growth</h2>
-        <div class="preview-skills">
-          <div class="preview-skill-card skill-strength"><h4>💪 Going Well</h4><ul>${fmtList(post.sections.strengths)}</ul></div>
-          <div class="preview-skill-card skill-growth"><h4>🌱 Room to Grow</h4><ul>${fmtList(post.sections.growth)}</ul></div>
-        </div>
-        ${post.sections.growthPlan ? `<p style="font-size:0.9rem;color:var(--color-text-secondary);margin-top:16px">${post.sections.growthPlan}</p>` : ''}
+      <h1 class="modal-title" style="font-family: var(--font-heading); font-size: 2rem; margin-bottom: 16px;">${title}</h1>
+      <div class="modal-author" style="font-size: 0.9rem; color: var(--color-text-muted);">
+        <span>Jha Sundaram</span>
+        <span>· ${date}</span>
       </div>
-      <div class="preview-section preview-section-highlight"><h2>✨ Ending on a High Note</h2><div class="preview-content">${post.sections.positive || '<em>No content yet</em>'}</div></div>
     </div>
-  `;
+    <div class="modal-body" style="padding: 36px 44px;">
+      ${s.activities ? sec('🛠️', "What I've Been Working On", s.activities) : ''}
+      ${s.deadlines ? sec('📅', 'Deadlines & Planning', s.deadlines) : ''}
+      ${s.learning ? sec('💡', 'What I Learned', s.learning) : ''}
+      ${s.environment ? sec('👥', 'Environment & People', s.environment) : ''}
+      ${(s.strengths || s.growth) ? `
+        <div class="modal-section">
+          <h3><span class="modal-section-icon">📊</span> Strengths & Growth</h3>
+          <div class="skills-grid">
+            <div class="skill-card skill-strength">
+              <h4>💪 Going Well</h4>
+              <ul>${skillList(s.strengths)}</ul>
+            </div>
+            <div class="skill-card skill-growth">
+              <h4>🌱 Room to Grow</h4>
+              <ul>${skillList(s.growth)}</ul>
+            </div>
+          </div>
+          ${s.growthPlan ? `<p class="growth-plan"><strong>My plan:</strong> ${s.growthPlan}</p>` : ''}
+        </div>` : ''}
+      ${s.positive ? `
+        <div class="modal-section modal-section-highlight">
+          <h3><span class="modal-section-icon">✨</span> Ending on a High Note</h3>
+          <div class="modal-section-content">${s.positive}</div>
+        </div>` : ''}
+    </div>`;
+  
   previewModal.classList.add('open');
 }
 
-function fmtList(text) {
-  if (!text) return '<li><em>None listed</em></li>';
-  return text.split('\n').map(l => l.replace(/^[•\-*]\s*/, '').trim()).filter(Boolean).map(l => `<li>→ ${l}</li>`).join('') || '<li><em>None listed</em></li>';
+function sec(icon, title, content) {
+  return `
+    <div class="modal-section">
+      <h3><span class="modal-section-icon">${icon}</span> ${title}</h3>
+      <div class="modal-section-content">${content}</div>
+    </div>`;
+}
+
+function skillList(text) {
+  if (!text) return '<li>None listed</li>';
+  return text.split('\n')
+    .map(l => l.replace(/^[•\-*]\s*/, '').trim())
+    .filter(Boolean)
+    .map(l => `<li>${l}</li>`)
+    .join('') || '<li>None listed</li>';
 }
 
 // ─── Utils ───────────────────────────────────
-function showToast(message, type = '') {
+function fmtDate(d) {
+  if (!d) return 'No date';
+  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function showToast(message, type = 'info') {
   toast.textContent = message;
   toast.className = 'toast show ' + type;
-  setTimeout(() => toast.classList.remove('show'), 2500);
+  setTimeout(() => toast.classList.remove('show'), 3000);
 }
