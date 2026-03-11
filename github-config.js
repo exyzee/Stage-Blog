@@ -35,8 +35,11 @@ async function fetchAllPosts() {
   });
   if (!res.ok) throw new Error('GitHub API ' + res.status);
   const data = await res.json();
-  const content = atob(data.content);
+  
+  // Properly decode unicode content
+  const content = decodeURIComponent(escape(atob(data.content)));
   const posts = JSON.parse(content);
+  
   return { posts, sha: data.sha };
 }
 
@@ -46,7 +49,10 @@ async function fetchAllPosts() {
 async function savePosts(posts, sha) {
   if (!GITHUB_TOKEN) throw new Error('No GitHub token');
   const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${POSTS_FILE}`;
-  const content = btoa(JSON.stringify(posts, null, 2));
+  
+  // Properly encode unicode (emojis, special chars) for btoa
+  const jsonString = JSON.stringify(posts, null, 2);
+  const content = btoa(unescape(encodeURIComponent(jsonString)));
   
   const res = await fetch(url, {
     method: 'PUT',
