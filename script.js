@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initScrollProgress();
   initNavBehavior();
   initHeroReveal();
-  initScrollReveals();
   loadAndRenderPosts();
   setupMobileMenu();
   setupSmoothScroll();
@@ -46,13 +45,9 @@ function initHeroReveal() {
   const content = document.querySelector('.hero-content');
   if (!title || !content) return;
 
-  // Wrap each word in reveal span
-  const html = title.innerHTML;
-  // Split by spaces but keep the HTML tags intact
   const processed = wrapWordsInHTML(title);
   title.innerHTML = processed;
 
-  // Trigger after a short paint delay
   requestAnimationFrame(() => {
     setTimeout(() => {
       title.classList.add('animate');
@@ -62,58 +57,27 @@ function initHeroReveal() {
 }
 
 function wrapWordsInHTML(el) {
-  // Get text content and HTML
-  const rawHTML = el.innerHTML.trim();
-  
-  // Simple approach: work with the inner HTML
-  // Split top-level text nodes while preserving HTML elements
   const temp = document.createElement('div');
-  temp.innerHTML = rawHTML;
-  
+  temp.innerHTML = el.innerHTML.trim();
   let result = '';
-  
+
   temp.childNodes.forEach(node => {
     if (node.nodeType === Node.TEXT_NODE) {
-      // Wrap each word in text nodes
-      const words = node.textContent.split(/(\s+)/);
-      words.forEach(word => {
+      node.textContent.split(/(\s+)/).forEach(word => {
         if (word.trim()) {
           result += `<span class="word"><span class="word-inner">${word}</span></span> `;
         }
       });
     } else if (node.nodeType === Node.ELEMENT_NODE) {
-      // Keep elements (like <span class="hero-name">) but wrap their text too
       const tag = node.tagName.toLowerCase();
       const attrs = Array.from(node.attributes).map(a => `${a.name}="${a.value}"`).join(' ');
-      const innerWords = node.textContent.split(/(\s+)/);
-      const wrappedInner = innerWords
+      const wrappedInner = node.textContent.split(/(\s+)/)
         .map(w => w.trim() ? `<span class="word"><span class="word-inner">${w}</span></span>` : '')
-        .filter(Boolean)
-        .join(' ');
+        .filter(Boolean).join(' ');
       result += `<${tag} ${attrs}>${wrappedInner}</${tag}> `;
     }
   });
-  
   return result.trim();
-}
-
-// ─── Scroll Reveal (IntersectionObserver) ────
-function initScrollReveals() {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        e.target.classList.add('visible');
-        observer.unobserve(e.target);
-      }
-    });
-  }, { rootMargin: '0px 0px -60px 0px', threshold: 0.1 });
-
-  document.querySelectorAll('.section-header, .featured-post, .posts-grid, .footer-content, .empty-state')
-    .forEach((el, i) => {
-      el.classList.add('reveal');
-      if (i > 0) el.classList.add(`reveal-d${Math.min(i, 4)}`);
-      observer.observe(el);
-    });
 }
 
 // ─── Load Posts ───────────────────────────────
@@ -123,10 +87,18 @@ async function loadAndRenderPosts() {
   const emptyState = document.getElementById('emptyState');
   const postsContainer = document.getElementById('postsContainer');
 
+  if (!featuredPost || !postsGrid || !emptyState || !postsContainer) {
+    console.error('[Blog] Missing DOM elements');
+    return;
+  }
+
   let posts = [];
 
-  if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured()) {
-    console.log('[Blog] Supabase configured — fetching posts...');
+  // Check if Supabase is available
+  const supabaseReady = typeof isSupabaseConfigured === 'function' && isSupabaseConfigured();
+
+  if (supabaseReady) {
+    console.log('[Blog] Fetching from Supabase...');
     try {
       const { data, error } = await supabase
         .from('posts')
@@ -135,23 +107,26 @@ async function loadAndRenderPosts() {
         .order('date', { ascending: false });
 
       if (error) {
-        console.error('[Blog] Supabase query error:', error.message, error);
+        console.error('[Blog] Supabase error:', error.message);
         throw error;
       }
       posts = data || [];
-      console.log('[Blog] Loaded', posts.length, 'published posts from Supabase');
+      console.log('[Blog] Got', posts.length, 'posts from Supabase');
     } catch (err) {
-      console.error('[Blog] Falling back to localStorage:', err);
+      console.error('[Blog] Supabase failed, trying localStorage:', err);
       posts = getLocalPosts();
     }
   } else {
-    console.log('[Blog] Supabase not configured — using localStorage');
+    console.log('[Blog] No Supabase — using localStorage');
     posts = getLocalPosts();
   }
 
+  // Render
   if (!posts.length) {
     postsContainer.style.display = 'none';
     emptyState.style.display = 'block';
+    // Fade in empty state
+    requestAnimationFrame(() => emptyState.classList.add('fade-in'));
     return;
   }
 
@@ -159,7 +134,6 @@ async function loadAndRenderPosts() {
   emptyState.style.display = 'none';
 
   const [featured, ...rest] = posts;
-
   featuredPost.innerHTML = renderFeaturedCard(featured);
 
   if (rest.length) {
@@ -168,6 +142,15 @@ async function loadAndRenderPosts() {
   } else {
     postsGrid.style.display = 'none';
   }
+
+  // Animate content in
+  requestAnimationFrame(() => {
+    featuredPost.classList.add('fade-in');
+    postsGrid.classList.add('fade-in');
+  });
+
+  // Set up scroll reveal for footer
+  initFooterReveal();
 
   // Bind clicks
   document.querySelectorAll('[data-post-id]').forEach(card => {
@@ -178,10 +161,27 @@ async function loadAndRenderPosts() {
   });
 }
 
+function initFooterReveal() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('fade-in');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { rootMargin: '0px 0px -40px 0px', threshold: 0.1 });
+
+  document.querySelectorAll('.footer-content').forEach(el => observer.observe(el));
+}
+
 function getLocalPosts() {
-  const stored = localStorage.getItem('internship_blog_posts');
-  const all = stored ? JSON.parse(stored) : [];
-  return all.filter(p => p.status === 'published').sort((a, b) => new Date(b.date) - new Date(a.date));
+  try {
+    const stored = localStorage.getItem('internship_blog_posts');
+    const all = stored ? JSON.parse(stored) : [];
+    return all.filter(p => p.status === 'published').sort((a, b) => new Date(b.date) - new Date(a.date));
+  } catch (e) {
+    return [];
+  }
 }
 
 function renderFeaturedCard(post) {
@@ -270,7 +270,7 @@ function openPostModal(post) {
       </div>
     </div>
     <div class="modal-body">
-      ${s.activities ? sec('🛠️', 'What I've Been Working On', s.activities) : ''}
+      ${s.activities ? sec('🛠️', "What I've Been Working On", s.activities) : ''}
       ${s.deadlines ? sec('📅', 'Deadlines & Planning', s.deadlines) : ''}
       ${s.learning ? sec('💡', 'What I Learned', s.learning) : ''}
       ${s.environment ? sec('👥', 'Environment & People', s.environment) : ''}
@@ -300,8 +300,7 @@ function openPostModal(post) {
   document.body.style.overflow = 'hidden';
 
   // Stagger modal sections in
-  const sections = content.querySelectorAll('.modal-section');
-  sections.forEach((el, i) => {
+  content.querySelectorAll('.modal-section').forEach((el, i) => {
     setTimeout(() => el.classList.add('in'), 120 + i * 70);
   });
 
