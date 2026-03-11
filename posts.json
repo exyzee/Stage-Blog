@@ -1,11 +1,11 @@
 [
   {
     "id": "post_1773249523955",
-    "week": "ss",
-    "date": "2026-03-11",
+    "week": "Week 1-2",
+    "date": "2026-02-22",
     "status": "published",
-    "title": "s",
-    "excerpt": "s",
+    "title": "Starting at Playground",
+    "excerpt": "First weeks getting familiar with the product, the team, and how new features move from idea to implementation at scale.",
     "sections": {
       "activities": "<p data-start=\"673\" data-end=\"825\">The first couple of weeks were mainly about getting a deeper understanding of Playground as a product and how the team approaches building new features.</p>\n<p data-start=\"827\" data-end=\"1272\">Since the internship focuses on designing and validating new product features, I started by getting involved in discussions around potential <strong data-start=\"968\" data-end=\"985\">creator tools</strong>, including features like background removal and image conversion. My role has been helping explore how these tools could fit into the existing product experience. That involved conversations with the CEO and COO, thinking through possible implementations, and starting early wireframes.</p>\n<p data-start=\"1274\" data-end=\"1482\">Because Playground is used by a large number of creators every month, a big part of the work is making sure new features <strong data-start=\"1395\" data-end=\"1446\">integrate naturally into the existing workflows</strong> rather than just adding more tools.</p>\n<p data-start=\"1484\" data-end=\"1716\">Alongside that, I started looking into <strong data-start=\"1523\" data-end=\"1562\">template usage and creator activity</strong>, monitoring which templates are performing well and how creators interact with them. This helped give context for how the product is actually being used.</p>\n<p data-start=\"1718\" data-end=\"1921\">Most of my work so far has been around <strong data-start=\"1757\" data-end=\"1806\">product thinking and early design exploration</strong> — mapping out flows, wireframing potential solutions, and discussing how ideas could realistically be implemented.</p>",
       "deadlines": "<p data-start=\"1955\" data-end=\"2039\">The first weeks were more about <strong data-start=\"1987\" data-end=\"2016\">exploration and alignment</strong> than strict deadlines.</p>\n<p data-start=\"2041\" data-end=\"2223\">Because new features need to work within an existing platform used by many people, the early stage is focused on making sure ideas make sense before committing development resources.</p>\n<p data-start=\"2225\" data-end=\"2372\">The goal over the next few weeks is to refine the concepts we've been exploring and move them toward <strong data-start=\"2326\" data-end=\"2371\">clear prototypes and implementation plans</strong>.</p>",
