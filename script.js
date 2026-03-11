@@ -126,19 +126,26 @@ async function loadAndRenderPosts() {
   let posts = [];
 
   if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured()) {
+    console.log('[Blog] Supabase configured — fetching posts...');
     try {
       const { data, error } = await supabase
         .from('posts')
         .select('*')
         .eq('status', 'published')
         .order('date', { ascending: false });
-      if (error) throw error;
+
+      if (error) {
+        console.error('[Blog] Supabase query error:', error.message, error);
+        throw error;
+      }
       posts = data || [];
+      console.log('[Blog] Loaded', posts.length, 'published posts from Supabase');
     } catch (err) {
-      console.error('Supabase error:', err);
+      console.error('[Blog] Falling back to localStorage:', err);
       posts = getLocalPosts();
     }
   } else {
+    console.log('[Blog] Supabase not configured — using localStorage');
     posts = getLocalPosts();
   }
 

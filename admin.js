@@ -1,13 +1,13 @@
 /* ============================================
    ADMIN PANEL — BLOG MANAGEMENT
-   With Supabase Backend
+   All data flows through Supabase JS client.
+   No manual SQL for data. Ever.
    ============================================ */
 
 const ADMIN_PASSWORD = 'jhajhablinks';
-const STORAGE_KEY = 'internship_blog_posts';
 
-// SQL to create table and seed posts
-const SETUP_SQL = `-- Run this in Supabase SQL Editor (one-time setup)
+// Minimal SQL: just table + RLS. Data is handled by JS.
+const SETUP_SQL = `-- Run this ONCE in Supabase SQL Editor
 
 CREATE TABLE IF NOT EXISTS posts (
   id TEXT PRIMARY KEY,
@@ -16,43 +16,70 @@ CREATE TABLE IF NOT EXISTS posts (
   status TEXT DEFAULT 'draft',
   title TEXT,
   excerpt TEXT,
-  sections JSONB,
+  sections JSONB DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Public can read published posts" ON posts;
-DROP POLICY IF EXISTS "Allow all operations" ON posts;
+DROP POLICY IF EXISTS "Anyone can read published" ON posts;
+DROP POLICY IF EXISTS "Anyone can do anything" ON posts;
 
-CREATE POLICY "Public can read published posts" ON posts
-  FOR SELECT USING (status = 'published');
+-- Let anyone read published posts (public blog)
+CREATE POLICY "Anyone can read published" ON posts
+  FOR SELECT USING (true);
 
-CREATE POLICY "Allow all operations" ON posts
-  FOR ALL USING (true);
+-- Let anyone insert/update/delete (admin uses anon key)
+CREATE POLICY "Anyone can do anything" ON posts
+  FOR ALL USING (true) WITH CHECK (true);
+`;
 
--- Week 1-2 post
-INSERT INTO posts (id, week, date, status, title, excerpt, sections) VALUES (
-  'post_week1_2', 'Week 1–2', '2026-02-23', 'published',
-  'Remote Start: Getting My Bearings from 8,000 Miles Away',
-  'My first two weeks at Playground have been entirely remote — onboarding from home while preparing for my move to Atlanta.',
-  '{"activities": "<p>So I officially started at Playground on February 9th, but here''s the thing — I''m doing it all remotely for now. I don''t fly out to Atlanta until the end of the month, so these first two weeks have been a lot of async communication, getting access to tools, and trying to understand how things work here.</p><p>Most of my time went into <strong>learning the product inside out</strong>. Playground is an AI image generation platform, and there''s a lot to unpack — the creator tools, the community features, how templates work, the whole ecosystem.</p><p>I also started looking into some <strong>new feature concepts</strong> they''re exploring — specifically tools like background removal and image format conversion.</p>", "deadlines": "<p>Honestly, there weren''t hard deadlines these two weeks — it was more about getting oriented.</p><p><strong>✓ Get all my accounts and tools set up</strong> (Figma, Slack, Notion, etc.)<br><strong>✓ Read through existing product docs</strong><br><strong>✓ Familiarize myself with the design system</strong></p><p><strong>Next up:</strong> I land in Atlanta on Feb 28 and start in the office on March 2nd.</p>", "learning": "<p>The biggest learning curve has been understanding how an AI product company thinks about features. There''s so much consideration around <strong>what creators actually need</strong> vs. what''s technically cool to build.</p><p>I''ve also been learning how to work async effectively — writing longer Slack messages with more context, recording Loom videos for complex stuff.</p>", "environment": "<p>Hard to talk about environment when I''m working from my bedroom lol. But the team has been super welcoming even remotely. I''ve had video calls with my mentor and a few other designers, and everyone seems genuinely excited to have me join.</p>", "strengths": "• Picking up new tools quickly\\n• Self-directed learning\\n• Written communication", "growth": "• Speaking up in meetings\\n• Asking for feedback proactively\\n• Understanding the business side", "growthPlan": "I''m planning to be more vocal once I''m in the office. Also going to start asking more why questions about product decisions.", "positive": "<p>The highlight was definitely my first call with the CEO. He was super approachable and genuinely interested in my background. He mentioned he''s excited to have fresh eyes on the product. That felt good.</p><p>Two weeks down. Atlanta in a few days. Let''s go 🚀</p>"}'::jsonb
-) ON CONFLICT (id) DO NOTHING;
+// ─── Initial seed data ───────────────────────
+const SEED_POSTS = [
+  {
+    id: 'post_week1_2',
+    week: 'Week 1–2',
+    date: '2026-02-23',
+    status: 'published',
+    title: 'Remote Start: Getting My Bearings from 8,000 Miles Away',
+    excerpt: 'My first two weeks at Playground have been entirely remote — onboarding from home while preparing for my move to Atlanta.',
+    sections: {
+      activities: "<p>So I officially started at Playground on February 9th, but here's the thing — I'm doing it all remotely for now. I don't fly out to Atlanta until the end of the month, so these first two weeks have been a lot of async communication, getting access to tools, and trying to understand how things work here.</p><p>Most of my time went into <strong>learning the product inside out</strong>. Playground is an AI image generation platform, and there's a lot to unpack — the creator tools, the community features, how templates work, the whole ecosystem. I've been clicking around like a new user would, taking notes on what makes sense and what doesn't.</p><p>I also started looking into some <strong>new feature concepts</strong> they're exploring — specifically tools like background removal and image format conversion. Nothing too deep yet, mostly just understanding the scope and what's already been discussed.</p>",
+      deadlines: "<p>Honestly, there weren't hard deadlines these two weeks — it was more about getting oriented. The main goal was to:</p><p><strong>✓ Get all my accounts and tools set up</strong> (Figma, Slack, Notion, etc.)<br><strong>✓ Read through existing product docs</strong><br><strong>✓ Familiarize myself with the design system</strong></p><p>All done, though I definitely feel like I've only scratched the surface. The design system is pretty comprehensive and I'm still wrapping my head around all the components.</p><p><strong>Next up:</strong> I land in Atlanta on Feb 28 and start in the office on March 2nd. The real work begins then — I'll be diving into the feature design work properly.</p>",
+      learning: "<p>The biggest learning curve has been understanding how an AI product company thinks about features. It's different from what I expected — there's so much consideration around <strong>what creators actually need</strong> vs. what's technically cool to build.</p><p>I've also been learning how to work async effectively. When you're 8,000 miles away and timezones barely overlap, you have to be really intentional about communication. I've been writing longer Slack messages with more context, recording Loom videos for complex stuff, and being very explicit about questions instead of assuming I can just \"ask later.\"</p><p>Small thing but — I learned that Playground has a pretty active creator community. That's going to be relevant for my work since my internship focuses on creator-related experiences.</p>",
+      environment: "<p>Hard to talk about \"environment\" when I'm working from my bedroom lol. But the team has been super welcoming even remotely. I've had video calls with my mentor and a few other designers, and everyone seems genuinely excited to have me join.</p><p>I've mostly been interacting with the product and design folks so far. The vibe is pretty chill — people share memes in Slack, there are casual watercooler channels, and nobody seems stressed about response times which is nice.</p><p>Can't wait to actually meet everyone in person though. There's only so much you can pick up over video calls.</p>",
+      strengths: "• Picking up new tools quickly\n• Self-directed learning\n• Written communication (been getting good feedback on my async updates)",
+      growth: "• Speaking up in meetings (I've been pretty quiet on calls)\n• Asking for feedback proactively\n• Understanding the business side of product decisions",
+      growthPlan: "I'm planning to be more vocal once I'm in the office. Easier to jump into conversations when you're actually in the room. Also going to start asking more \"why\" questions about product decisions — I want to understand the reasoning, not just the what.",
+      positive: "<p>Okay real talk — I was nervous about starting remotely. Like, what if I miss important context? What if I can't build relationships with the team? But it's actually been fine. Better than fine.</p><p>The highlight was definitely my first call with the CEO. Not gonna lie, I was intimidated, but he was super approachable and genuinely interested in my background and what I want to learn. He mentioned he's excited to have fresh eyes on the product. That felt good.</p><p>Two weeks down. Atlanta in a few days. Let's go 🚀</p>"
+    }
+  },
+  {
+    id: 'post_week3_4',
+    week: 'Week 3–4',
+    date: '2026-03-09',
+    status: 'published',
+    title: 'Boots on the Ground: First Weeks in Atlanta',
+    excerpt: 'I made it to Atlanta, joined the team in person, and immediately got pulled into some exciting feature work. Also, I\'ve been in leadership meetings? Wild.',
+    sections: {
+      activities: "<p>Landed in Atlanta on February 28th, took a day to recover from jet lag, and showed up at the office on Monday March 2nd. It's been a whirlwind since then.</p><p>The big focus has been on <strong>new creator tools</strong> — specifically the background remover and image converter I mentioned last time. These went from \"concepts we're exploring\" to \"okay let's actually figure out how to build this.\" I've been:</p><ul><li>Talking directly with the CEO and COO about product direction</li><li>Coming up with implementation plans for how these features should work</li><li>Wireframing user flows</li><li>Designing the actual UI within Playground's design system</li><li>Working with developers to make sure my designs are actually buildable</li></ul><p>On top of that, I got pulled into the <strong>Alice project</strong>. Alice is an AI assistant Playground is launching, and I'm helping design the landing page for it. It's exciting but also a lot — going from \"here's the concept\" to \"we need designs\" happened fast.</p><p>Oh, and I've started <strong>monitoring template metrics</strong> and helping out with creator program operations. Less glamorous but honestly pretty interesting to see what content actually performs well.</p>",
+      deadlines: "<p>Things are moving faster now. The background remover wireframes were due mid-week and I hit that deadline. The Alice landing page is still in progress — we're iterating based on feedback.</p><p><strong>What's on track:</strong></p><ul><li>✓ BG remover wireframes done</li><li>✓ Image converter initial flows mapped out</li><li>→ Alice landing page (in review, some revisions needed)</li></ul><p><strong>Coming up:</strong> Finalizing Alice designs this week, then moving the creator tools into higher fidelity. Also need to do some user testing on the flows I've designed — that's new territory for me here.</p>",
+      learning: "<p>So many things. First off, <strong>I've been in leadership meetings</strong>. Like, actual strategy discussions with the CEO and COO. I mostly listen and take notes, but it's been eye-opening to see how decisions get made at that level. They think about things I wouldn't have considered — market timing, competitive positioning, resource allocation.</p><p>On the design side, I'm learning how to work within an existing design system while still pushing for what I think is right. There's a balance between \"follow the system\" and \"the system doesn't cover this use case\" — figuring out when to extend vs. when to adapt.</p><p>Also learning a ton about <strong>cross-functional collaboration</strong>. Designers here don't just hand off mockups — we're involved in implementation, QA, even launch decisions. It's way more integrated than I expected.</p>",
+      environment: "<p>The office is great. Open floor plan, good snacks, and I can literally walk over to someone's desk to ask a question instead of scheduling a call. Sounds basic but after two weeks of remote work it feels like a superpower.</p><p>My mentor has been amazing — they check in daily without being overbearing and give really constructive feedback. I shadowed them in a stakeholder meeting and learned a lot about how to present design rationale.</p><p>The team is small and tight-knit. Everyone knows everyone. There's this thing where people eat lunch together most days, and the conversations range from deep product debates to completely random tangents. Good energy.</p><p>Atlanta itself is new to me. Still figuring out the city, finding good coffee spots, getting used to the weather. It's an adjustment but I'm enjoying it.</p>",
+      strengths: "• Visual design — my mockups are getting good feedback\n• Taking initiative (I've been proposing ideas, not just waiting for tasks)\n• Adapting quickly to the in-person workflow",
+      growth: "• Presenting to stakeholders (still get nervous)\n• Estimating timelines accurately (I underestimated the Alice page work)\n• Pushing back constructively when I disagree with feedback",
+      growthPlan: "For presenting, I'm going to start doing more casual share-outs with the team before big stakeholder meetings. Practice in lower-stakes settings. For estimation, I'm going to start adding buffer time and tracking how long things actually take vs. how long I thought they would.",
+      positive: "<p>Honestly? This has been one of the best fortnights of my life. The imposter syndrome is still there — I'm sitting in meetings with the CEO thinking \"why am I here\" — but I'm starting to trust that they brought me on for a reason.</p><p>Best moment: I proposed an idea for the image converter flow that wasn't in the original brief, and it got picked up. Like, it's going to be in the product. Something I thought of. That's wild.</p><p>Also, I designed my first thing that might actually ship. The Alice landing page isn't final yet, but seeing my work potentially go live to real users is a different feeling. Scary but exciting.</p><p>Week 4 done. Starting to feel like I actually work here. 💪</p>"
+    }
+  }
+];
 
--- Week 3-4 post
-INSERT INTO posts (id, week, date, status, title, excerpt, sections) VALUES (
-  'post_week3_4', 'Week 3–4', '2026-03-09', 'published',
-  'Boots on the Ground: First Weeks in Atlanta',
-  'I made it to Atlanta, joined the team in person, and immediately got pulled into some exciting feature work.',
-  '{"activities": "<p>Landed in Atlanta on February 28th, took a day to recover from jet lag, and showed up at the office on Monday March 2nd. It''s been a whirlwind since then.</p><p>The big focus has been on <strong>new creator tools</strong> — specifically the background remover and image converter. I''ve been:</p><ul><li>Talking directly with the CEO and COO about product direction</li><li>Coming up with implementation plans</li><li>Wireframing user flows</li><li>Designing the actual UI</li><li>Working with developers on implementation</li></ul><p>I also got pulled into the <strong>Alice project</strong> — an AI assistant Playground is launching. I''m helping design the landing page.</p><p>Plus <strong>monitoring template metrics</strong> and helping out with creator program operations.</p>", "deadlines": "<p>Things are moving faster now.</p><p><strong>What''s on track:</strong></p><ul><li>✓ BG remover wireframes done</li><li>✓ Image converter initial flows mapped out</li><li>→ Alice landing page (in review)</li></ul><p><strong>Coming up:</strong> Finalizing Alice designs, then moving creator tools into higher fidelity.</p>", "learning": "<p><strong>I''ve been in leadership meetings</strong>. Actual strategy discussions with the CEO and COO. It''s been eye-opening to see how decisions get made at that level.</p><p>I''m learning how to work within an existing design system while still pushing for what I think is right.</p><p>Also learning about <strong>cross-functional collaboration</strong>. Designers here are involved in implementation, QA, even launch decisions.</p>", "environment": "<p>The office is great. Open floor plan, good snacks, and I can literally walk over to someone''s desk to ask a question.</p><p>My mentor has been amazing — they check in daily and give really constructive feedback.</p><p>Atlanta itself is new to me. Still figuring out the city, finding good coffee spots.</p>", "strengths": "• Visual design — my mockups are getting good feedback\\n• Taking initiative\\n• Adapting quickly to the in-person workflow", "growth": "• Presenting to stakeholders (still get nervous)\\n• Estimating timelines accurately\\n• Pushing back constructively", "growthPlan": "For presenting, I''m going to do more casual share-outs before big meetings. For estimation, I''m adding buffer time and tracking actual vs. estimated time.", "positive": "<p>Best moment: I proposed an idea for the image converter flow that wasn''t in the original brief, and it got picked up. Like, it''s going to be in the product. Something I thought of. That''s wild.</p><p>Week 4 done. Starting to feel like I actually work here. 💪</p>"}'::jsonb
-) ON CONFLICT (id) DO NOTHING;`;
-
-// State
+// ─── State ───────────────────────────────────
 let currentPostId = null;
 let posts = [];
 let useSupabase = false;
 
-// DOM Elements
+// ─── DOM ─────────────────────────────────────
 const loginScreen = document.getElementById('loginScreen');
 const setupScreen = document.getElementById('setupScreen');
 const adminDashboard = document.getElementById('adminDashboard');
@@ -73,9 +100,10 @@ const toast = document.getElementById('toast');
 const copySqlBtn = document.getElementById('copySqlBtn');
 const retrySetupBtn = document.getElementById('retrySetupBtn');
 
-// ─── Initialization ───────────────────────────
+// ─── Init ────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   useSupabase = typeof isSupabaseConfigured === 'function' && isSupabaseConfigured();
+  console.log('[Admin] Supabase configured:', useSupabase);
 
   if (sessionStorage.getItem('admin_logged_in') === 'true') {
     await tryShowDashboard();
@@ -85,7 +113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initializeRichEditors();
 });
 
-// ─── Event Listeners ──────────────────────────
+// ─── Events ──────────────────────────────────
 function setupEventListeners() {
   loginForm.addEventListener('submit', handleLogin);
   logoutBtn.addEventListener('click', handleLogout);
@@ -94,17 +122,15 @@ function setupEventListeners() {
   previewBtn.addEventListener('click', showPreview);
   closePreviewBtn.addEventListener('click', () => previewModal.classList.remove('open'));
   deletePostBtn.addEventListener('click', handleDeletePost);
-
   previewModal.addEventListener('click', (e) => {
     if (e.target === previewModal) previewModal.classList.remove('open');
   });
 
-  // Setup screen buttons
   if (copySqlBtn) {
     copySqlBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(SETUP_SQL).then(() => {
         copySqlBtn.textContent = '✓ Copied!';
-        setTimeout(() => { copySqlBtn.textContent = '📋 Copy Setup SQL'; }, 2000);
+        setTimeout(() => copySqlBtn.textContent = '📋 Copy Setup SQL', 2000);
       });
     });
   }
@@ -112,13 +138,15 @@ function setupEventListeners() {
   if (retrySetupBtn) {
     retrySetupBtn.addEventListener('click', async () => {
       retrySetupBtn.textContent = 'Checking...';
+      retrySetupBtn.disabled = true;
       await tryShowDashboard();
       retrySetupBtn.textContent = "I've run the SQL — Try Again";
+      retrySetupBtn.disabled = false;
     });
   }
 }
 
-// ─── Authentication ───────────────────────────
+// ─── Auth ────────────────────────────────────
 async function handleLogin(e) {
   e.preventDefault();
   if (passwordInput.value === ADMIN_PASSWORD) {
@@ -142,10 +170,11 @@ function handleLogout() {
 
 async function tryShowDashboard() {
   loginScreen.style.display = 'none';
-  
+
   if (useSupabase) {
-    const tableExists = await checkTableExists();
-    if (!tableExists) {
+    const ok = await checkTable();
+    if (!ok) {
+      console.log('[Admin] Table not found — showing setup screen');
       setupScreen.style.display = 'flex';
       adminDashboard.style.display = 'none';
       return;
@@ -155,20 +184,49 @@ async function tryShowDashboard() {
   setupScreen.style.display = 'none';
   adminDashboard.style.display = 'block';
   await loadPosts();
+
+  // Auto-seed if table exists but is empty
+  if (useSupabase && posts.length === 0) {
+    console.log('[Admin] Table is empty — seeding initial posts...');
+    await seedInitialPosts();
+    await loadPosts();
+  }
+
   renderPostsList();
 }
 
-async function checkTableExists() {
+async function checkTable() {
   try {
-    const { data, error } = await supabase.from('posts').select('id').limit(1);
-    // If we get here without a "relation does not exist" error, table exists
-    return !error || !error.message.includes('does not exist');
+    const { error } = await supabase.from('posts').select('id').limit(1);
+    if (error) {
+      console.log('[Admin] Table check error:', error.message);
+      return !error.message.includes('does not exist') && !error.message.includes('relation');
+    }
+    return true;
   } catch (err) {
+    console.log('[Admin] Table check exception:', err);
     return false;
   }
 }
 
-// ─── Posts Management ─────────────────────────
+// ─── Auto-Seed ───────────────────────────────
+async function seedInitialPosts() {
+  for (const post of SEED_POSTS) {
+    try {
+      const { error } = await supabase.from('posts').upsert(post, { onConflict: 'id' });
+      if (error) {
+        console.error('[Admin] Seed error for', post.id, ':', error.message);
+      } else {
+        console.log('[Admin] Seeded:', post.id);
+      }
+    } catch (err) {
+      console.error('[Admin] Seed exception for', post.id, ':', err);
+    }
+  }
+  showToast('Initial blog posts added!', 'success');
+}
+
+// ─── Posts CRUD ──────────────────────────────
 async function loadPosts() {
   if (useSupabase) {
     try {
@@ -179,13 +237,14 @@ async function loadPosts() {
 
       if (error) throw error;
 
-      posts = (data || []).map(post => ({
-        ...post,
-        sections: typeof post.sections === 'string' ? JSON.parse(post.sections) : post.sections
+      posts = (data || []).map(p => ({
+        ...p,
+        sections: typeof p.sections === 'string' ? JSON.parse(p.sections) : p.sections
       }));
+      console.log('[Admin] Loaded', posts.length, 'posts from Supabase');
     } catch (err) {
-      console.error('Error loading from Supabase:', err);
-      showToast('Error loading posts', 'error');
+      console.error('[Admin] Load error:', err);
+      showToast('Error loading posts: ' + err.message, 'error');
       loadLocalPosts();
     }
   } else {
@@ -194,29 +253,29 @@ async function loadPosts() {
 }
 
 function loadLocalPosts() {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = localStorage.getItem('internship_blog_posts');
   posts = stored ? JSON.parse(stored) : [];
 }
 
 function saveLocalPosts() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
+  localStorage.setItem('internship_blog_posts', JSON.stringify(posts));
 }
 
 function renderPostsList() {
-  if (posts.length === 0) {
+  if (!posts.length) {
     postsList.innerHTML = '<div class="posts-list-empty">No posts yet.<br>Click "+ New Post" to start!</div>';
     return;
   }
 
-  const sortedPosts = [...posts].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sorted = [...posts].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  postsList.innerHTML = sortedPosts.map(post => `
-    <div class="post-list-item ${post.id === currentPostId ? 'active' : ''}" data-id="${post.id}">
+  postsList.innerHTML = sorted.map(p => `
+    <div class="post-list-item ${p.id === currentPostId ? 'active' : ''}" data-id="${p.id}">
       <div class="post-list-item-week">
-        <span class="status-dot ${post.status}"></span>
-        ${post.week || 'No week'}
+        <span class="status-dot ${p.status}"></span>
+        ${p.week || 'No week'}
       </div>
-      <div class="post-list-item-title">${post.title || 'Untitled'}</div>
+      <div class="post-list-item-title">${p.title || 'Untitled'}</div>
     </div>
   `).join('');
 
@@ -241,11 +300,7 @@ async function createNewPost() {
 
   if (useSupabase) {
     try {
-      const { error } = await supabase.from('posts').insert({
-        id: newPost.id, week: newPost.week, date: newPost.date,
-        status: newPost.status, title: newPost.title, excerpt: newPost.excerpt,
-        sections: newPost.sections
-      });
+      const { error } = await supabase.from('posts').insert(newPost);
       if (error) throw error;
     } catch (err) {
       showToast('Error creating post: ' + err.message, 'error');
@@ -279,27 +334,26 @@ function loadPostIntoEditor(postId) {
   document.getElementById('postTitle').value = post.title || '';
   document.getElementById('postExcerpt').value = post.excerpt || '';
 
-  const sections = post.sections || {};
-  setEditorContent('section1Editor', sections.activities || '');
-  setEditorContent('section2Editor', sections.deadlines || '');
-  setEditorContent('section3Editor', sections.learning || '');
-  setEditorContent('section4Editor', sections.environment || '');
-  setEditorContent('section6Editor', sections.positive || '');
-
-  document.getElementById('strengthsEditor').value = sections.strengths || '';
-  document.getElementById('growthEditor').value = sections.growth || '';
-  document.getElementById('growthPlanEditor').value = sections.growthPlan || '';
+  const s = post.sections || {};
+  setEditorContent('section1Editor', s.activities || '');
+  setEditorContent('section2Editor', s.deadlines || '');
+  setEditorContent('section3Editor', s.learning || '');
+  setEditorContent('section4Editor', s.environment || '');
+  setEditorContent('section6Editor', s.positive || '');
+  document.getElementById('strengthsEditor').value = s.strengths || '';
+  document.getElementById('growthEditor').value = s.growth || '';
+  document.getElementById('growthPlanEditor').value = s.growthPlan || '';
 }
 
 async function handleSavePost(e) {
   e.preventDefault();
   if (!currentPostId) return;
 
-  const postIndex = posts.findIndex(p => p.id === currentPostId);
-  if (postIndex === -1) return;
+  const idx = posts.findIndex(p => p.id === currentPostId);
+  if (idx === -1) return;
 
-  const updatedPost = {
-    ...posts[postIndex],
+  const updated = {
+    ...posts[idx],
     week: document.getElementById('postWeek').value,
     date: document.getElementById('postDate').value,
     status: document.getElementById('postStatus').value,
@@ -322,18 +376,19 @@ async function handleSavePost(e) {
       const { error } = await supabase
         .from('posts')
         .update({
-          week: updatedPost.week, date: updatedPost.date, status: updatedPost.status,
-          title: updatedPost.title, excerpt: updatedPost.excerpt, sections: updatedPost.sections
+          week: updated.week, date: updated.date, status: updated.status,
+          title: updated.title, excerpt: updated.excerpt, sections: updated.sections
         })
         .eq('id', currentPostId);
       if (error) throw error;
+      console.log('[Admin] Saved to Supabase:', currentPostId);
     } catch (err) {
       showToast('Error saving: ' + err.message, 'error');
       return;
     }
   }
 
-  posts[postIndex] = updatedPost;
+  posts[idx] = updated;
   if (!useSupabase) saveLocalPosts();
   renderPostsList();
   showToast('Post saved!', 'success');
@@ -341,12 +396,13 @@ async function handleSavePost(e) {
 
 async function handleDeletePost() {
   if (!currentPostId) return;
-  if (!confirm('Are you sure you want to delete this post?')) return;
+  if (!confirm('Delete this post permanently?')) return;
 
   if (useSupabase) {
     try {
       const { error } = await supabase.from('posts').delete().eq('id', currentPostId);
       if (error) throw error;
+      console.log('[Admin] Deleted from Supabase:', currentPostId);
     } catch (err) {
       showToast('Error deleting: ' + err.message, 'error');
       return;
@@ -362,7 +418,7 @@ async function handleDeletePost() {
   showToast('Post deleted', 'success');
 }
 
-// ─── Rich Text Editor ─────────────────────────
+// ─── Rich Text Editor ────────────────────────
 function initializeRichEditors() {
   document.querySelectorAll('.rich-editor').forEach(editor => {
     const section = editor.dataset.section;
@@ -380,17 +436,15 @@ function initializeRichEditors() {
     `;
 
     const content = editor.querySelector('.rich-editor-content');
-    const toolbar = editor.querySelector('.rich-editor-toolbar');
-
-    toolbar.querySelectorAll('.toolbar-btn').forEach(btn => {
+    editor.querySelector('.rich-editor-toolbar').querySelectorAll('.toolbar-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        const command = btn.dataset.command;
-        if (command === 'createLink') {
+        const cmd = btn.dataset.command;
+        if (cmd === 'createLink') {
           const url = prompt('Enter URL:');
           if (url) document.execCommand('createLink', false, url);
         } else {
-          document.execCommand(command, false, null);
+          document.execCommand(cmd, false, null);
         }
         content.focus();
       });
@@ -399,29 +453,27 @@ function initializeRichEditors() {
 }
 
 function getPlaceholder(section) {
-  const placeholders = {
+  const map = {
     activities: 'Describe what you worked on, skills you used, and any realizations...',
     deadlines: 'Did you meet your deadlines? What\'s coming up next?',
     learning: 'What new things did you learn? How did you learn them?',
     environment: 'Tell us about your workspace, colleagues, mentor...',
     positive: 'End with something positive! A win, a nice moment, something you\'re proud of...'
   };
-  return placeholders[section] || 'Write here...';
+  return map[section] || 'Write here...';
 }
 
 function setEditorContent(editorId, content) {
-  const editor = document.getElementById(editorId);
-  const contentDiv = editor?.querySelector('.rich-editor-content');
-  if (contentDiv) contentDiv.innerHTML = content;
+  const el = document.getElementById(editorId)?.querySelector('.rich-editor-content');
+  if (el) el.innerHTML = content;
 }
 
 function getEditorContent(editorId) {
-  const editor = document.getElementById(editorId);
-  const contentDiv = editor?.querySelector('.rich-editor-content');
-  return contentDiv ? contentDiv.innerHTML : '';
+  const el = document.getElementById(editorId)?.querySelector('.rich-editor-content');
+  return el ? el.innerHTML : '';
 }
 
-// ─── Preview ──────────────────────────────────
+// ─── Preview ─────────────────────────────────
 function showPreview() {
   const post = {
     week: document.getElementById('postWeek').value,
@@ -439,7 +491,7 @@ function showPreview() {
     }
   };
 
-  const formattedDate = post.date 
+  const formattedDate = post.date
     ? new Date(post.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'No date';
 
@@ -460,8 +512,7 @@ function showPreview() {
       .preview-skill-card h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 12px; }
       .preview-skill-card ul { list-style: none; font-size: 0.9rem; color: var(--color-text-secondary); padding: 0; }
       .preview-skill-card li { padding: 4px 0; }
-      .preview-growth-plan { font-size: 0.9rem; color: var(--color-text-secondary); margin-top: 16px; }
-      .preview-section-highlight { background: linear-gradient(135deg, var(--color-accent-light), #FEF3C7); }
+      .preview-section-highlight { background: linear-gradient(135deg, var(--color-accent-light), #F5F0FF); }
       .preview-section-highlight .preview-content { color: var(--color-text); }
     </style>
     <div class="post-preview">
@@ -470,62 +521,30 @@ function showPreview() {
         <span class="preview-date">${formattedDate}</span>
       </div>
       <h1 class="preview-title">${post.title || 'Untitled'}</h1>
-
+      <div class="preview-section"><h2>🛠️ What I've Been Working On</h2><div class="preview-content">${post.sections.activities || '<em>No content yet</em>'}</div></div>
+      <div class="preview-section"><h2>📅 Deadlines & Planning</h2><div class="preview-content">${post.sections.deadlines || '<em>No content yet</em>'}</div></div>
+      <div class="preview-section"><h2>💡 What I Learned</h2><div class="preview-content">${post.sections.learning || '<em>No content yet</em>'}</div></div>
+      <div class="preview-section"><h2>👥 Environment & People</h2><div class="preview-content">${post.sections.environment || '<em>No content yet</em>'}</div></div>
       <div class="preview-section">
-        <h2>🛠️ What I've Been Working On</h2>
-        <div class="preview-content">${post.sections.activities || '<em>No content yet</em>'}</div>
-      </div>
-
-      <div class="preview-section">
-        <h2>📅 Deadlines & Planning</h2>
-        <div class="preview-content">${post.sections.deadlines || '<em>No content yet</em>'}</div>
-      </div>
-
-      <div class="preview-section">
-        <h2>💡 What I Learned</h2>
-        <div class="preview-content">${post.sections.learning || '<em>No content yet</em>'}</div>
-      </div>
-
-      <div class="preview-section">
-        <h2>👥 Environment & People</h2>
-        <div class="preview-content">${post.sections.environment || '<em>No content yet</em>'}</div>
-      </div>
-
-      <div class="preview-section">
-        <h2>📊 Strengths & Growth Areas</h2>
+        <h2>📊 Strengths & Growth</h2>
         <div class="preview-skills">
-          <div class="preview-skill-card skill-strength">
-            <h4>💪 Going Well</h4>
-            <ul>${formatListItems(post.sections.strengths)}</ul>
-          </div>
-          <div class="preview-skill-card skill-growth">
-            <h4>🌱 Room to Grow</h4>
-            <ul>${formatListItems(post.sections.growth)}</ul>
-          </div>
+          <div class="preview-skill-card skill-strength"><h4>💪 Going Well</h4><ul>${fmtList(post.sections.strengths)}</ul></div>
+          <div class="preview-skill-card skill-growth"><h4>🌱 Room to Grow</h4><ul>${fmtList(post.sections.growth)}</ul></div>
         </div>
-        ${post.sections.growthPlan ? `<p class="preview-growth-plan">${post.sections.growthPlan}</p>` : ''}
+        ${post.sections.growthPlan ? `<p style="font-size:0.9rem;color:var(--color-text-secondary);margin-top:16px">${post.sections.growthPlan}</p>` : ''}
       </div>
-
-      <div class="preview-section preview-section-highlight">
-        <h2>✨ Ending on a High Note</h2>
-        <div class="preview-content">${post.sections.positive || '<em>No content yet</em>'}</div>
-      </div>
+      <div class="preview-section preview-section-highlight"><h2>✨ Ending on a High Note</h2><div class="preview-content">${post.sections.positive || '<em>No content yet</em>'}</div></div>
     </div>
   `;
-
   previewModal.classList.add('open');
 }
 
-function formatListItems(text) {
+function fmtList(text) {
   if (!text) return '<li><em>None listed</em></li>';
-  return text.split('\n')
-    .map(line => line.replace(/^[•\-\*]\s*/, '').trim())
-    .filter(line => line)
-    .map(line => `<li>→ ${line}</li>`)
-    .join('') || '<li><em>None listed</em></li>';
+  return text.split('\n').map(l => l.replace(/^[•\-*]\s*/, '').trim()).filter(Boolean).map(l => `<li>→ ${l}</li>`).join('') || '<li><em>None listed</em></li>';
 }
 
-// ─── Utilities ────────────────────────────────
+// ─── Utils ───────────────────────────────────
 function showToast(message, type = '') {
   toast.textContent = message;
   toast.className = 'toast show ' + type;
