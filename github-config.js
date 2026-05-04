@@ -14,10 +14,17 @@ let GITHUB_TOKEN = localStorage.getItem('github_token') || '';
  * Fetch published posts from GitHub
  */
 async function fetchPublishedPosts() {
-  const url = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${POSTS_FILE}`;
-  const res = await fetch(url + '?t=' + Date.now()); // Cache bust
-  if (!res.ok) throw new Error('GitHub HTTP ' + res.status);
-  const all = await res.json();
+  let all;
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    const res = await fetch(POSTS_FILE + '?t=' + Date.now());
+    if (!res.ok) throw new Error('Local HTTP ' + res.status);
+    all = await res.json();
+  } else {
+    const url = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${POSTS_FILE}`;
+    const res = await fetch(url + '?t=' + Date.now());
+    if (!res.ok) throw new Error('GitHub HTTP ' + res.status);
+    all = await res.json();
+  }
   return all.filter(p => p.status === 'published').sort((a, b) => new Date(b.date) - new Date(a.date));
 }
 
